@@ -14,6 +14,7 @@
     "./github/client": "./github/client.ts",
     "./github/handlers": "./github/handlers.ts",
     "./github/proposal": "./github/proposal.ts",
+    "./repository-analysis": "./github/analysisStore.ts",
     "./github/parser": "./github/parser.ts",
     "./sherlock/manifest": "./sherlock/manifest.ts",
     "./sherlock/parser": "./sherlock/parser.ts",
