@@ -395,6 +395,50 @@
     display: none;
   }
 
+  .nx-groups-panel {
+    position: absolute;
+    inset-block: var(--nx-space-4) auto;
+    inset-inline-end: var(--nx-space-4);
+    inline-size: min(26rem, 90vw);
+    max-block-size: 60vh;
+    overflow: auto;
+    padding: var(--nx-space-3);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--nx-radius-3);
+    background: var(--surface-1);
+    box-shadow: var(--nx-shadow-2, 0 8px 24px rgb(0 0 0 / 25%));
+    z-index: 5;
+  }
+
+  .nx-groups-panel header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--nx-space-2);
+    margin-block-end: var(--nx-space-2);
+  }
+
+  .nx-groups-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--nx-space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .nx-groups-list li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--nx-space-2);
+  }
+
+  .nx-groups-label {
+    flex: 1 1 8rem;
+    font-weight: 600;
+  }
+
   .nx-zoom-cluster {
     position: absolute;
     right: var(--nx-space-4);

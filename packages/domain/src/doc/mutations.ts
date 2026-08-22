@@ -285,6 +285,24 @@ export function addGroup(
   });
 }
 
+/** Patches group fields (collapsed, label, geometry). Mirrors `updateNode` deliberately. */
+export function updateGroup(
+  doc: Y.Doc,
+  id: string,
+  patch: Record<string, unknown>,
+  options: { origin: Origin; now: string },
+): boolean {
+  const roots = boardRoots(doc);
+  const map = roots.groups.get(id);
+  if (map === undefined) return false;
+  tx(doc, options.origin, () => {
+    for (const [key, value] of Object.entries(patch)) map.set(key, value);
+    bumpUpdated(map, options.now);
+    touchBoard(roots, options.now);
+  });
+  return true;
+}
+
 export function removeGroup(
   doc: Y.Doc,
   id: string,

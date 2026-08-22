@@ -47,6 +47,7 @@ import { PasteToast } from '../../capture/PasteToast.tsx';
 import { captureTransfer, usePaste, type CaptureResult } from '../../capture/usePaste.ts';
 import { useDropZone } from '../../capture/useDropZone.ts';
 import { useCopyCut } from '../../capture/useCopyCut.ts';
+import { GroupsPanel } from './GroupsPanel.tsx';
 import { groupSelected, ungroupSelected } from './groupCommands.ts';
 
 import { useRegisterCommands } from '../commands/useRegisterCommands.ts';
@@ -103,6 +104,7 @@ export function BoardWorkspace() {
   // Absent, not disabled, when the capability is off (ADR-002, N2): nothing below renders.
   const [integrationsOpen, setIntegrationsOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
+  const [groupsOpen, setGroupsOpen] = useState(false);
 
   // Auto Arrange is ephemeral UI state, never document state (P14a, N2).
   const arrangeOpen = useAutoArrangeStore((state) => state.open);
@@ -344,6 +346,14 @@ export function BoardWorkspace() {
           run: () => setAiOpen(true),
         },
         {
+          id: 'board.groups',
+          title: 'Groups…',
+          group: 'board' as const,
+          keywords: ['groups', 'clusters', 'frames', 'collapse', 'lock'],
+          when: (ctx: { view: string }) => ctx.view === 'board',
+          run: () => setGroupsOpen(true),
+        },
+        {
           id: 'board.ungroup',
           title: 'Ungroup selection',
           group: 'board' as const,
@@ -470,6 +480,14 @@ export function BoardWorkspace() {
           data-testid="auto-arrange-open"
         >
           Auto arrange
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={() => setGroupsOpen(!groupsOpen)}
+          aria-expanded={groupsOpen}
+          data-testid="groups-open"
+        >
+          Groups
         </Button>
         <Button variant="secondary" onClick={() => setHistoryOpen(true)}>
           Version history
@@ -680,6 +698,15 @@ export function BoardWorkspace() {
           <ImportDialog open={importOpen} onOpenChange={setImportOpen} onConfirm={confirmImport} />
         ) : null}
       </Suspense>
+
+      <GroupsPanel
+        open={groupsOpen}
+        doc={doc}
+        context={groupContext()}
+        onClose={() => setGroupsOpen(false)}
+        onSelect={(ids) => setSelectedIds([...ids])}
+        onNotice={setNotice}
+      />
 
       <AutoArrangePanel
         doc={doc}
