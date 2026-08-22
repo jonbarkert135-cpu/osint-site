@@ -23,6 +23,7 @@ import {
 } from '@nexus/domain';
 import { Banner, Button } from '@nexus/ui';
 import type { Engine, Intent } from '@nexus/canvas-engine';
+import type { CSSProperties } from 'react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
@@ -110,6 +111,21 @@ export function BoardWorkspace() {
   const arrangeOpen = useAutoArrangeStore((state) => state.open);
   const arrangeDiff = useAutoArrangeStore((state) => state.diff);
   const setArrangeOpen = useAutoArrangeStore((state) => state.setOpen);
+  /** Both panels dock into the same top-right corner, so only one of them is ever open. */
+  const openGroups = useCallback(
+    (open: boolean) => {
+      setGroupsOpen(open);
+      if (open) setArrangeOpen(false);
+    },
+    [setArrangeOpen],
+  );
+  const openArrange = useCallback(
+    (open: boolean) => {
+      setArrangeOpen(open);
+      if (open) setGroupsOpen(false);
+    },
+    [setArrangeOpen],
+  );
 
   const boardStatus = useBoardStatus();
   const [capture, setCapture] = useState<CaptureResult | null>(null);
@@ -283,7 +299,7 @@ export function BoardWorkspace() {
       keywords: ['layout', 'arrange', 'tidy', 'organise', 'organize', 'graph'],
       shortcut: 'Ctrl+Alt+R',
       when: (ctx: { view: string }) => ctx.view === 'board',
-      run: () => setArrangeOpen(true),
+      run: () => openArrange(true),
     },
   ]);
 
@@ -293,11 +309,11 @@ export function BoardWorkspace() {
       if (!(event.metaKey || event.ctrlKey) || !event.altKey) return;
       if (event.key.toLowerCase() !== 'r') return;
       event.preventDefault();
-      setArrangeOpen(true);
+      openArrange(true);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [setArrangeOpen]);
+  }, [openArrange]);
 
   useRegisterCommands(
     capabilities.integrations
@@ -351,7 +367,7 @@ export function BoardWorkspace() {
           group: 'board' as const,
           keywords: ['groups', 'clusters', 'frames', 'collapse', 'lock'],
           when: (ctx: { view: string }) => ctx.view === 'board',
-          run: () => setGroupsOpen(true),
+          run: () => openGroups(true),
         },
         {
           id: 'board.ungroup',
@@ -467,7 +483,11 @@ export function BoardWorkspace() {
   );
 
   return (
-    <section className="nx-board" aria-label="Board">
+    <section
+      className="nx-board"
+      aria-label="Board"
+      style={{ '--nx-inspector-width': `${String(inspectorWidth)}px` } as CSSProperties}
+    >
       <header className="nx-board-bar">
         <Button onClick={addNote} data-testid="add-note">
           Add note
@@ -475,7 +495,7 @@ export function BoardWorkspace() {
         <QuickAdd onNote={addNote} onCapture={quickCapture} />
         <Button
           variant="secondary"
-          onClick={() => setArrangeOpen(!arrangeOpen)}
+          onClick={() => openArrange(!arrangeOpen)}
           aria-expanded={arrangeOpen}
           data-testid="auto-arrange-open"
         >
@@ -483,7 +503,7 @@ export function BoardWorkspace() {
         </Button>
         <Button
           variant="secondary"
-          onClick={() => setGroupsOpen(!groupsOpen)}
+          onClick={() => openGroups(!groupsOpen)}
           aria-expanded={groupsOpen}
           data-testid="groups-open"
         >
@@ -703,7 +723,7 @@ export function BoardWorkspace() {
         open={groupsOpen}
         doc={doc}
         context={groupContext()}
-        onClose={() => setGroupsOpen(false)}
+        onClose={() => openGroups(false)}
         onSelect={(ids) => setSelectedIds([...ids])}
         onNotice={setNotice}
       />

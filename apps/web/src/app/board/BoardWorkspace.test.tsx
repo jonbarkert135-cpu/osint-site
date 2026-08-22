@@ -108,6 +108,22 @@ describe('<BoardWorkspace>', () => {
     await waitFor(() => expect(document.activeElement).toBe(title));
   });
 
+  it('keeps one panel in the right dock: opening auto arrange closes groups', async () => {
+    view();
+    await waitFor(() => expect(screen.getByTestId('sync-status')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('groups-open'));
+    expect(screen.getByTestId('groups-panel')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('auto-arrange-open'));
+    await waitFor(() => expect(screen.queryByTestId('groups-panel')).toBeNull());
+    expect(screen.getByTestId('auto-arrange-panel')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('groups-open'));
+    await waitFor(() => expect(screen.queryByTestId('auto-arrange-panel')).toBeNull());
+    expect(screen.getByTestId('groups-panel')).toBeInTheDocument();
+  });
+
   it('exports the board as a downloadable archive', async () => {
     const createObjectURL = vi.fn(() => 'blob:board');
     const revokeObjectURL = vi.fn();

@@ -258,6 +258,7 @@
 
   /* Board page: a fixed top bar over a full-height canvas (P3 §6). */
   .nx-board {
+    --nx-dock-inset: var(--nx-inspector-width, 0px);
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -398,7 +399,7 @@
   .nx-groups-panel {
     position: absolute;
     inset-block: var(--nx-space-4) auto;
-    inset-inline-end: var(--nx-space-4);
+    inset-inline-end: calc(var(--nx-dock-inset, 0px) + var(--nx-space-4));
     inline-size: min(26rem, 90vw);
     max-block-size: 60vh;
     overflow: auto;
@@ -532,7 +533,7 @@
   .nx-layout-panel {
     position: absolute;
     inset-block-start: var(--nx-space-5);
-    inset-inline-end: var(--nx-space-5);
+    inset-inline-end: calc(var(--nx-dock-inset, 0px) + var(--nx-space-5));
     z-index: var(--nx-z-dropdown);
     display: flex;
     flex-direction: column;
@@ -1192,6 +1193,11 @@
   }
 
   @media (max-width: 720px) {
+    /* The inspector is a bottom sheet here, so the right dock has nothing to clear. */
+    .nx-board {
+      --nx-dock-inset: 0px;
+    }
+
     .nx-board-main {
       grid-template-columns: minmax(0, 1fr);
     }
