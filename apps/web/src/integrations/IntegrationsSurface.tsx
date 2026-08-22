@@ -24,6 +24,7 @@ import { IntegrationPicker } from './IntegrationPicker.tsx';
 import { ProposalReview } from './ProposalReview.tsx';
 import { RunHistory } from './RunHistory.tsx';
 import { RunPanel } from './RunPanel.tsx';
+import { externalRunUrl } from './externalRun.ts';
 import { installedIntegrations } from './useIntegrations.ts';
 import type { IntegrationSummary, RunUiState } from './types.ts';
 
@@ -62,6 +63,7 @@ export function IntegrationsSurface({
   const [runId, setRunId] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState(0);
   const [errorCode, setErrorCode] = useState<IntegrationErrorCode | undefined>(undefined);
+  const [externalUrl, setExternalUrl] = useState<string | undefined>(undefined);
   const [proposal, setProposal] = useState<ImportProposal | null>(null);
   const [applied, setApplied] = useState<{
     nodes: number;
@@ -100,6 +102,7 @@ export function IntegrationsSurface({
           : [{ kind: target.kind, value: target.label, scope: 'public-index' as const }];
       setStep('run');
       setErrorCode(undefined);
+      setExternalUrl(externalRunUrl(integration.id, input));
       setStartedAt(Date.now());
       try {
         const { consentToken } = await runs.acceptConsent({
@@ -195,6 +198,7 @@ export function IntegrationsSurface({
               ? () => void runs.cancelRun({ runId })
               : undefined
           }
+          externalUrl={externalUrl}
           onRetry={() => void start(chosen)}
           onReview={() => void review()}
         />

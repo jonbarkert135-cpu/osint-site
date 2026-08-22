@@ -164,6 +164,21 @@ describe('RunPanel', () => {
     expect(screen.getByText(new RegExp(copy.action.slice(0, 20)))).toBeInTheDocument();
   });
 
+  it('links back into the tool when the run has a page there, and never otherwise', () => {
+    const { rerender } = render(
+      <RunPanel
+        {...base}
+        state="succeeded"
+        externalUrl="https://sf.example.test/scaninfo?id=abcd"
+      />,
+    );
+    const link = screen.getByTestId('run-external-link');
+    expect(link).toHaveAttribute('href', 'https://sf.example.test/scaninfo?id=abcd');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    rerender(<RunPanel {...base} state="succeeded" />);
+    expect(screen.queryByTestId('run-external-link')).not.toBeInTheDocument();
+  });
+
   it('treats a run with no results as an explained empty state, not an error', () => {
     render(<RunPanel {...base} state="succeeded" itemsFound={0} />);
     expect(screen.getByText('No results found')).toBeInTheDocument();

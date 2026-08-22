@@ -31,6 +31,8 @@ export interface RunPanelProps {
   onCancel?: (() => void) | undefined;
   onRetry?: (() => void) | undefined;
   onReview?: (() => void) | undefined;
+  /** Deep link back into the tool this run came from; absent when the tool has no such page. */
+  externalUrl?: string | undefined;
 }
 
 const ACTIVE: readonly RunUiState[] = ['queued', 'starting', 'running', 'parsing'];
@@ -53,6 +55,7 @@ export function RunPanel({
   onCancel,
   onRetry,
   onReview,
+  externalUrl,
 }: RunPanelProps) {
   const active = ACTIVE.includes(state);
   const error = errorCode === undefined ? null : payloadFor(errorCode, { runId });
@@ -115,6 +118,17 @@ export function RunPanel({
         itemsFound !== 0 ? (
           <Button onClick={onReview}>Review results</Button>
         ) : null}
+        {externalUrl === undefined ? null : (
+          <a
+            className="nx-link"
+            href={externalUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid="run-external-link"
+          >
+            Open in {integrationName}
+          </a>
+        )}
       </footer>
     </section>
   );

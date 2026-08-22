@@ -11,6 +11,8 @@ import { manifest as expandUrlManifest } from '../builtin/manifest.ts';
 import { parser as expandUrlParser } from '../builtin/parser.ts';
 import { manifest as githubManifest } from '../github/manifest.ts';
 import { parser as githubParser } from '../github/parser.ts';
+import { manifest as spiderFootManifest } from '../spiderfoot/manifest.ts';
+import { parser as spiderFootParser } from '../spiderfoot/parser.ts';
 import {
   defaultNodeMapper,
   defaultRelationshipMapper,
@@ -65,6 +67,7 @@ export interface IntegrationSource {
 export const BUILTIN_SOURCES: readonly IntegrationSource[] = [
   { raw: expandUrlManifest, parser: expandUrlParser },
   { raw: githubManifest, parser: githubParser },
+  { raw: spiderFootManifest, parser: spiderFootParser },
 ];
 
 export interface LoadRegistryOptions {

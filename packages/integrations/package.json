@@ -15,12 +15,14 @@
     "./github/handlers": "./github/handlers.ts",
     "./github/proposal": "./github/proposal.ts",
     "./github/parser": "./github/parser.ts",
+    "./spiderfoot/manifest": "./spiderfoot/manifest.ts",
+    "./spiderfoot/parser": "./spiderfoot/parser.ts",
     "./plugins": "./src/plugins.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "lint": "eslint src builtin github"
+    "lint": "eslint src builtin github spiderfoot"
   },
   "dependencies": {
     "@nexus/config": "workspace:*",
