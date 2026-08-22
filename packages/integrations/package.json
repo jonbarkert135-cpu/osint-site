@@ -15,6 +15,8 @@
     "./github/handlers": "./github/handlers.ts",
     "./github/proposal": "./github/proposal.ts",
     "./github/parser": "./github/parser.ts",
+    "./sherlock/manifest": "./sherlock/manifest.ts",
+    "./sherlock/parser": "./sherlock/parser.ts",
     "./spiderfoot/manifest": "./spiderfoot/manifest.ts",
     "./spiderfoot/parser": "./spiderfoot/parser.ts",
     "./plugins": "./src/plugins.ts"
@@ -22,7 +24,7 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "lint": "eslint src builtin github spiderfoot"
+    "lint": "eslint src builtin github sherlock spiderfoot"
   },
   "dependencies": {
     "@nexus/config": "workspace:*",
