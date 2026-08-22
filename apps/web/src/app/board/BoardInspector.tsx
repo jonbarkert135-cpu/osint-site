@@ -23,6 +23,7 @@ export interface BoardInspectorProps {
   onWidthChange: (width: number) => void;
   onClose: () => void;
   onEdgeDeleted?: (() => void) | undefined;
+  focusTitleFor?: string | undefined;
 }
 
 export function BoardInspector({
@@ -34,6 +35,7 @@ export function BoardInspector({
   onWidthChange,
   onClose,
   onEdgeDeleted,
+  focusTitleFor,
 }: BoardInspectorProps) {
   const edgeId = selectedEdgeOf(doc, selectedIds);
   if (edgeId === null) {
@@ -45,6 +47,7 @@ export function BoardInspector({
         width={width}
         onWidthChange={onWidthChange}
         onClose={onClose}
+        focusTitleFor={focusTitleFor}
       />
     );
   }

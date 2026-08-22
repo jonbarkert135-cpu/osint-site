@@ -99,6 +99,7 @@ export function BoardWorkspace() {
   const [counts, setCounts] = useState({ nodes: 0, edges: 0 });
   const [selectedIds, setSelectedIds] = useState<readonly string[]>([]);
   const [inspectorWidth, setInspectorWidth] = useState(360);
+  const [focusTitleFor, setFocusTitleFor] = useState<string | undefined>(undefined);
   // Absent, not disabled, when the capability is off (ADR-002, N2): nothing below renders.
   const [integrationsOpen, setIntegrationsOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
@@ -380,7 +381,11 @@ export function BoardWorkspace() {
       viewport === undefined
         ? { x: 0, y: 0 }
         : { x: viewport.x + viewport.w / 2, y: viewport.y + viewport.h / 2 };
-    createNoteNode(context, at);
+    // Select the new note and focus its title: typing must land in the field, not in the
+    // single-key board shortcuts (§36).
+    const id = createNoteNode(context, at);
+    setSelectedIds([id]);
+    setFocusTitleFor(id);
     // `context` is rebuilt every render on purpose: it only holds the doc, history and clock.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc, history, engine]);
@@ -597,6 +602,7 @@ export function BoardWorkspace() {
           onWidthChange={setInspectorWidth}
           onClose={() => setSelectedIds([])}
           onEdgeDeleted={() => setSelectedIds([])}
+          focusTitleFor={focusTitleFor}
         />
       </div>
 

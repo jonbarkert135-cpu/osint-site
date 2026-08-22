@@ -96,6 +96,18 @@ describe('<BoardWorkspace>', () => {
     );
   });
 
+  it('focuses the title of a freshly created note so typing does not hit shortcuts', async () => {
+    view();
+    await waitFor(() => expect(screen.getByTestId('sync-status')).toBeInTheDocument());
+    const before = screen.queryByLabelText('Title');
+    expect(before).toBeNull();
+
+    fireEvent.click(screen.getByTestId('add-note'));
+
+    const title = await screen.findByLabelText('Title');
+    await waitFor(() => expect(document.activeElement).toBe(title));
+  });
+
   it('exports the board as a downloadable archive', async () => {
     const createObjectURL = vi.fn(() => 'blob:board');
     const revokeObjectURL = vi.fn();

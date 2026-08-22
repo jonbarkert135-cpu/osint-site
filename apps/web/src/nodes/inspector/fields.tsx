@@ -12,6 +12,8 @@ export interface FieldControlProps {
   value: unknown;
   disabled?: boolean;
   error?: string | undefined;
+  /** Text controls only: focus and select the value on mount (a freshly created node). */
+  focusOnMount?: boolean;
   /** Called on blur (text-ish controls) or immediately (select, toggle). */
   onCommit: (value: unknown) => void;
 }
@@ -32,6 +34,7 @@ export function FieldControl({
   value,
   disabled = false,
   error,
+  focusOnMount = false,
   onCommit,
 }: FieldControlProps) {
   const initial = field.control === 'multiselect' ? asLines(value) : asText(value);
@@ -117,6 +120,13 @@ export function FieldControl({
         type={field.control === 'number' ? 'number' : field.control === 'email' ? 'email' : 'text'}
         value={draft}
         placeholder={field.placeholder ?? ''}
+        ref={(element) => {
+          // Focus once, on mount, for a node the user just created; `autoFocus` is banned by a11y lint.
+          if (focusOnMount && element !== null && document.activeElement !== element) {
+            element.focus();
+            element.select();
+          }
+        }}
         onChange={(event) => setDraft(event.target.value)}
         onBlur={() => onCommit(field.control === 'number' ? Number(draft) : draft)}
       />

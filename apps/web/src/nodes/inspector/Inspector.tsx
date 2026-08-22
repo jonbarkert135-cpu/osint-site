@@ -43,6 +43,8 @@ export interface InspectorProps {
   width?: number;
   onWidthChange?: ((width: number) => void) | undefined;
   onClose?: (() => void) | undefined;
+  /** Id of a node whose title should be focused on selection (created just now). */
+  focusTitleFor?: string | undefined;
   now?: () => string;
 }
 
@@ -123,6 +125,7 @@ export function Inspector({
   width = INSPECTOR_DEFAULT_WIDTH,
   onWidthChange,
   onClose,
+  focusTitleFor,
   now = () => new Date().toISOString(),
 }: InspectorProps) {
   const single = selectedIds.length === 1 ? selectedIds[0] : undefined;
@@ -307,8 +310,11 @@ export function Inspector({
 
       <section className="nx-inspector-section">
         <FieldControl
+          // Remounting per node is what makes the autofocus fire for a freshly created note.
+          key={node.id}
           field={{ key: 'title', label: 'Title', control: 'text', section: 'identity' }}
           value={node.title}
+          focusOnMount={focusTitleFor === node.id}
           {...(issues['title'] === undefined ? {} : { error: issues['title'] })}
           onCommit={(value) => commitField('title', value)}
         />
