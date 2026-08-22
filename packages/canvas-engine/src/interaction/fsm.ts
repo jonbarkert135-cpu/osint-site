@@ -862,6 +862,14 @@ function onKeyDown(state: FsmState, e: FsmEvent & { t: 'keydown' }, ctx: FsmCont
         { t: 'focus-editor', id: anchor },
       ]);
     }
+    // `F` is the fit key every canvas tool has; `0` stays as the numeric-row equivalent.
+    case 'f':
+    case 'F':
+      return result(state, [{ t: 'camera-command', cmd: 'fit-all' }]);
+    // `H` latches hand/pan mode, the same state Space holds down, so it can be toggled hands-free.
+    case 'h':
+    case 'H':
+      return result(state.name === 'spacePan' ? { name: 'idle' } : { name: 'spacePan' });
     case '0':
       return result(state, [{ t: 'camera-command', cmd: 'fit-all' }]);
     case '1':

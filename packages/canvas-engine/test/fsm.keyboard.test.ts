@@ -121,6 +121,8 @@ describe('keyboard', () => {
   it('camera keys emit camera commands', () => {
     const ctx = context(nodes);
     const table: Array<[string, string]> = [
+      ['f', 'fit-all'],
+      ['F', 'fit-all'],
       ['0', 'fit-all'],
       ['1', 'zoom-100'],
       ['2', 'fit-selection'],
@@ -132,6 +134,14 @@ describe('keyboard', () => {
       expect(reduce({ name: 'idle' }, key(k), ctx).effects).toEqual([{ t: 'camera-command', cmd }]);
     }
     expect(reduce({ name: 'idle' }, key('q'), ctx).effects).toEqual([]);
+  });
+
+  it('H latches and unlatches hand mode, the same state Space holds', () => {
+    const ctx = context(nodes);
+    const latched = reduce({ name: 'idle' }, key('h'), ctx);
+    expect(latched.state.name).toBe('spacePan');
+    expect(latched.effects).toEqual([]);
+    expect(reduce(latched.state, key('H'), ctx).state.name).toBe('idle');
   });
 
   it('mid-gesture only Escape is honoured', () => {

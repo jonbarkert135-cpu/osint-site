@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CanvasHost } from './CanvasHost';
@@ -115,6 +115,42 @@ describe('CanvasHost', () => {
 
     expect(engine!.camera.state.x).not.toBe(before);
     expect(Number.isFinite(engine!.camera.state.x)).toBe(true);
+  });
+
+  it('zooms the board when the wheel is used over the minimap', () => {
+    let engine: Engine | null = null;
+    render(<CanvasHost onEngine={(e) => (engine = e ?? engine)} />);
+
+    const before = engine!.camera.state.zoom;
+    screen
+      .getByTestId('canvas-minimap')
+      .dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -100 }));
+
+    expect(engine!.camera.state.zoom).toBeGreaterThan(before);
+  });
+
+  it('hides and shows the minimap with M, but not while typing', () => {
+    render(<CanvasHost />);
+    expect(screen.getByTestId('canvas-minimap')).not.toHaveAttribute('hidden');
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'm' }));
+    });
+    expect(screen.getByTestId('canvas-minimap')).toHaveAttribute('hidden');
+
+    const field = document.createElement('input');
+    document.body.append(field);
+    field.focus();
+    act(() => {
+      field.dispatchEvent(new KeyboardEvent('keydown', { key: 'm', bubbles: true }));
+    });
+    expect(screen.getByTestId('canvas-minimap')).toHaveAttribute('hidden');
+    field.remove();
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'M' }));
+    });
+    expect(screen.getByTestId('canvas-minimap')).not.toHaveAttribute('hidden');
   });
 
   it('tears the engine down on unmount', () => {

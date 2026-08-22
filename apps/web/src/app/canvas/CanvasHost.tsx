@@ -64,6 +64,7 @@ export function CanvasHost({
   // Bundling is off at 0, which is where it starts: a fan of parallel relationships is information,
   // and collapsing it is a choice the analyst makes (07 §7.6, P5 part 4 §4).
   const [bundleDensity, setDensity] = useState(0);
+  const [minimapVisible, setMinimapVisible] = useState(true);
   const nodeCount = nodeCountProp ?? engineNodeCount;
 
   // The engine is created in an effect inside the hook, so it exists on the first commit.
@@ -71,6 +72,20 @@ export function CanvasHost({
     onEngine?.(engineRef.current);
     return () => onEngine?.(null);
   }, [engineRef, onEngine]);
+
+  // `M` hides and shows the minimap. Typing must never reach it, so a focused field wins (§7.6).
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key !== 'm' && event.key !== 'M') return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable === true) return;
+      setMinimapVisible((visible) => !visible);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const centre = useCallback(() => {
     const box = canvasRef.current?.getBoundingClientRect();
@@ -106,7 +121,8 @@ export function CanvasHost({
           className="nx-minimap"
           width={MINIMAP_WIDTH}
           height={MINIMAP_HEIGHT}
-          aria-label="Board minimap. Click or drag to move the view."
+          hidden={!minimapVisible}
+          aria-label="Board minimap. Click or drag to move the view, scroll to zoom."
         />
         {nodeCount === 0 ? (
           <p className="nx-canvas-empty" data-testid="canvas-empty">

@@ -390,6 +390,11 @@
     cursor: pointer;
   }
 
+  /* `M` hides the minimap; a canvas is display:block by default, so `hidden` needs saying. */
+  .nx-minimap[hidden] {
+    display: none;
+  }
+
   .nx-zoom-cluster {
     position: absolute;
     right: var(--nx-space-4);
