@@ -25,6 +25,7 @@ import {
 import { useCallback, useState, useSyncExternalStore } from 'react';
 import type * as Y from 'yjs';
 
+import { RepositoryAnalysisSection } from '../../integrations/RepositoryAnalysisSection.tsx';
 import { cardStateOf } from '../cardState.ts';
 import { NodeIcon } from '../icons.tsx';
 import type { NodeStore } from '../nodeStore.ts';
@@ -397,6 +398,17 @@ export function Inspector({
           </section>
         );
       })}
+
+      {/* A repository node, recognised by its payload rather than its type name (R1). */}
+      {typeof node.data['url'] === 'string' &&
+      node.data['url'] !== '' &&
+      typeof node.data['owner'] === 'string' &&
+      typeof node.data['name'] === 'string' ? (
+        <section className="nx-inspector-section" data-testid="inspector-analysis">
+          <h3>Repository analysis</h3>
+          <RepositoryAnalysisSection repositoryUrl={node.data['url']} />
+        </section>
+      ) : null}
 
       <section className="nx-inspector-section" data-testid="inspector-connections">
         <h3>Connections</h3>
