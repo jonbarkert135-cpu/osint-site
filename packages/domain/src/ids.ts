@@ -20,6 +20,7 @@ export const ID_KINDS = [
   'proposal',
   'consent',
   'apiToken',
+  'usernameWatch',
 ] as const;
 
 export type IdKind = (typeof ID_KINDS)[number];
@@ -44,6 +45,7 @@ export type RunId = Id<'run'>;
 export type ProposalId = Id<'proposal'>;
 export type ConsentId = Id<'consent'>;
 export type ApiTokenId = Id<'apiToken'>;
+export type UsernameWatchId = Id<'usernameWatch'>;
 
 // cuid2's own `isCuid` accepts any 2–32 char lowercase token ('nope' passes), which is useless as a
 // trust-boundary check. We generate ids at the default length, so we validate that exact shape.
@@ -96,4 +98,5 @@ export const newId = {
   proposal: factory('proposal'),
   consent: factory('consent'),
   apiToken: factory('apiToken'),
+  usernameWatch: factory('usernameWatch'),
 } as const;

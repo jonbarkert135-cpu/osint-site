@@ -30,6 +30,14 @@ export const prismaMock = {
     update: vi.fn(),
     count: vi.fn(),
   },
+  usernameWatch: {
+    findFirst: vi.fn(),
+    findMany: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    count: vi.fn(),
+  },
   runLogEntry: { findMany: vi.fn(), findFirst: vi.fn(), createMany: vi.fn() },
 };
 

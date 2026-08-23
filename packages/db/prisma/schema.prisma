@@ -616,3 +616,29 @@ model WorkspaceSetting {
   @@id([orgId, key])
   @@map("workspace_settings")
 }
+
+/// A standing Sherlock watch on one `username` node (13_SHERLOCK.md §6.6). Scheduling rules —
+/// cadence, ±10% jitter, 90-day consent expiry, quotas — live in `@nexus/integrations/sherlock/watch`
+/// so the API and the worker cannot disagree. A scheduled result is always a pending diff (N4).
+model UsernameWatch {
+  id        String    @id
+  orgId     String    @map("org_id")
+  projectId String    @map("project_id")
+  nodeId    String    @map("node_id")
+  handle    String    @db.VarChar(120)
+  createdBy String    @map("created_by")
+  cadence   String    @db.VarChar(16)
+  /// null = the tool's full site list.
+  sites     Json?
+  notifyOn  Json      @map("notify_on")
+  consentId String    @map("consent_id")
+  pausedAt  DateTime? @map("paused_at")
+  lastRunId String?   @map("last_run_id")
+  nextRunAt DateTime  @map("next_run_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@unique([projectId, nodeId])
+  @@index([nextRunAt])
+  @@map("username_watches")
+}

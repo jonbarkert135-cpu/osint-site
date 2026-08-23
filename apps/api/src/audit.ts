@@ -38,6 +38,8 @@ export type AuditAction =
   | 'integration.run.cancelled'
   | 'integration.proposal.applied'
   | 'integration.proposal.discarded'
+  | 'integration.watch.created'
+  | 'integration.watch.removed'
   | 'apiToken.created'
   | 'apiToken.revoked';
 
