@@ -10,6 +10,9 @@ export const AI_CAPABILITIES = [
   'suggest-connections',
   'cluster-nodes',
   'investigation-summary',
+  'generate-note',
+  'analyze-document',
+  'explain-repository',
 ] as const;
 
 export type AICapabilityId = (typeof AI_CAPABILITIES)[number];

@@ -150,3 +150,85 @@ export const investigationSummary: AICapability = {
     };
   },
 };
+
+/** §16 — "генерация заметок": one drafted note from whatever is selected. */
+export const generateNote: AICapability = {
+  id: 'generate-note',
+  needsProvider: true,
+  description: 'Drafts a research note from the selected cards, proposed for review.',
+  async run(ctx) {
+    const nodes = selected(ctx).slice(0, MAX_CONTEXT_NODES);
+    if (nodes.length === 0) throw new AIUnavailableError('generate-note needs at least one node');
+    const context = nodes.map((node) => `[${node.type}] ${nodeText(node)}`).join('\n\n');
+    const text = await ctx.provider.complete(
+      `Draft one research note from the material below: the facts it establishes, the open questions, and what to check next. Plain text, no preamble.\n\n${context}`,
+    );
+    const explain = `Note drafted from ${String(nodes.length)} card(s) by ${ctx.provider.modelId}.`;
+    return {
+      runId: ctx.runId,
+      capability: 'generate-note',
+      model: ctx.provider.modelId,
+      explanation: `${explain} Nothing was written: accept the proposal to add the note.`,
+      findings: [
+        {
+          id: ctx.runId,
+          title: 'Drafted note',
+          detail: text,
+          nodeIds: nodes.map((node) => node.id),
+        },
+      ],
+      proposal: noteProposal(ctx, 'Note — drafted', text, nodes, explain),
+    };
+  },
+};
+
+/** §16 — "анализ документов": the selected document/file card, read for claims and entities. */
+export const analyzeDocument: AICapability = {
+  id: 'analyze-document',
+  needsProvider: true,
+  description: 'Reads the selected document card and proposes a note of its claims and entities.',
+  async run(ctx) {
+    const node = selected(ctx)[0];
+    if (node === undefined) throw new AIUnavailableError('analyze-document needs a selected card');
+    const text = await ctx.provider.complete(
+      `Analyse this document for a research board. List its key claims, the entities it names (people, organisations, domains, addresses), and anything that looks unverified. Plain text, no preamble.\n\n${nodeText(node)}`,
+    );
+    const explain = `Document analysis of "${node.title}" by ${ctx.provider.modelId}.`;
+    return {
+      runId: ctx.runId,
+      capability: 'analyze-document',
+      model: ctx.provider.modelId,
+      explanation: `${explain} The extracted claims are the model's reading, not verified facts.`,
+      findings: [
+        { id: node.id, title: `Analysis of ${node.title}`, detail: text, nodeIds: [node.id] },
+      ],
+      proposal: noteProposal(ctx, `Analysis — ${node.title}`, text, [node], explain),
+    };
+  },
+};
+
+/** §16 — "объяснение репозитория": what a repository card is, in prose. Read-only. */
+export const explainRepository: AICapability = {
+  id: 'explain-repository',
+  needsProvider: true,
+  description: 'Explains what the selected repository does and how it could be integrated.',
+  async run(ctx) {
+    const node = selected(ctx).find(
+      (candidate) =>
+        typeof candidate.data['url'] === 'string' && typeof candidate.data['owner'] === 'string',
+    );
+    if (node === undefined) {
+      throw new AIUnavailableError('explain-repository needs a selected repository card');
+    }
+    const text = await ctx.provider.complete(
+      `Explain this source-code repository for a non-programmer analyst: what it does, what it needs to run, and how it could be plugged into an OSINT board. At most six sentences, plain text.\n\n${nodeText(node)}`,
+    );
+    return {
+      runId: ctx.runId,
+      capability: 'explain-repository',
+      model: ctx.provider.modelId,
+      explanation: `Explanation of "${node.title}" by ${ctx.provider.modelId}. Read-only capability: nothing is written to the board.`,
+      findings: [{ id: node.id, title: `About ${node.title}`, detail: text, nodeIds: [node.id] }],
+    };
+  },
+};

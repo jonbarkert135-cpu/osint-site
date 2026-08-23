@@ -126,7 +126,7 @@ describe('deterministic capabilities', () => {
       'suggest-connections',
       'cluster-nodes',
     ]);
-    expect(availableCapabilities(true)).toHaveLength(6);
+    expect(availableCapabilities(true)).toHaveLength(9);
   });
 });
 
@@ -225,5 +225,43 @@ describe('openAICompatibleProvider', () => {
         } as unknown as Response)) as typeof fetch,
     });
     await expect(empty.complete('x')).rejects.toThrow(AIUnavailableError);
+  });
+});
+
+describe('note, document and repository capabilities', () => {
+  const provider = { modelId: 'llama3.1:8b', complete: () => Promise.resolve('a summary') };
+
+  it('drafts a note from the selection and links it back to every source', async () => {
+    const result = await runCapability(
+      'generate-note',
+      ctx({ nodes: [node('a', 'Acme'), node('b', 'Beta')] }, { provider }),
+    );
+    const items = result.proposal?.items ?? [];
+    expect(items.filter((item) => item.kind === 'new_edge')).toHaveLength(2);
+    expect(result.findings[0]?.detail).toBe('a summary');
+  });
+
+  it('analyses the selected document card only', async () => {
+    const result = await runCapability(
+      'analyze-document',
+      ctx({ nodes: [node('a', 'Report.pdf', { data: { text: 'body' } })] }, { provider }),
+    );
+    expect(result.capability).toBe('analyze-document');
+    expect(result.proposal?.items[0]?.kind).toBe('new_node');
+  });
+
+  it('explains a repository card without writing anything', async () => {
+    const repo = node('r', 'spiderfoot', {
+      data: { url: 'https://github.com/smicallef/spiderfoot', owner: 'smicallef', name: 'sf' },
+    });
+    const result = await runCapability('explain-repository', ctx({ nodes: [repo] }, { provider }));
+    expect(result.proposal).toBeUndefined();
+    expect(result.findings[0]?.title).toContain('spiderfoot');
+  });
+
+  it('refuses to explain a card that is not a repository', async () => {
+    await expect(
+      runCapability('explain-repository', ctx({ nodes: [node('a', 'A')] }, { provider })),
+    ).rejects.toThrow(AIUnavailableError);
   });
 });

@@ -6,7 +6,14 @@
  */
 
 import { clusterNodes, findDuplicates, suggestConnections } from './capabilities/deterministic.ts';
-import { explainConnection, investigationSummary, summarizeNode } from './capabilities/model.ts';
+import {
+  analyzeDocument,
+  explainConnection,
+  explainRepository,
+  generateNote,
+  investigationSummary,
+  summarizeNode,
+} from './capabilities/model.ts';
 import { AIUnavailableError } from './provider.ts';
 import type { AICapability, AICapabilityId, AIRunContext, AIRunResult } from './types.ts';
 
@@ -17,6 +24,9 @@ export const CAPABILITIES: Readonly<Record<AICapabilityId, AICapability>> = {
   'suggest-connections': suggestConnections,
   'cluster-nodes': clusterNodes,
   'investigation-summary': investigationSummary,
+  'generate-note': generateNote,
+  'analyze-document': analyzeDocument,
+  'explain-repository': explainRepository,
 };
 
 /** Capabilities that work with no endpoint configured, for the "AI unavailable" UI state. */
