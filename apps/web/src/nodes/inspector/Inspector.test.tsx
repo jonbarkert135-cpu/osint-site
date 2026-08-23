@@ -135,6 +135,24 @@ describe('Inspector', () => {
     expect(getNode(doc, id)?.title).toBe('acmecorp.com leak');
   });
 
+  it('writes nothing when an untouched field loses focus, so undo keeps the real last step', async () => {
+    const { doc, store, ids } = board();
+    const id = ids[0] ?? '';
+    render(<Inspector doc={doc} store={store} selectedIds={[id]} now={() => T0} />);
+
+    const before = getNode(doc, id)?.updatedAt;
+    let updates = 0;
+    doc.on('update', () => {
+      updates += 1;
+    });
+
+    screen.getByLabelText('Title').focus();
+    await userEvent.tab();
+
+    expect(updates).toBe(0);
+    expect(getNode(doc, id)?.updatedAt).toBe(before);
+  });
+
   it('restores the stored title on Escape', async () => {
     const { doc, store, ids } = board();
     const id = ids[0] ?? '';

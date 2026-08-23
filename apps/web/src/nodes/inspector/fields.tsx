@@ -44,6 +44,15 @@ export function FieldControl({
   // React forever — that was the hang in BoardWorkspace's export test.
   const focusClaimed = useRef(false);
 
+  // An untouched field must not write to the document. `updateNode` always sets the key and bumps
+  // `updatedAt`, so a blur that commits the unchanged value still lands on the undo stack — and the
+  // next ⌘Z (or Undo click, which blurs the field first) reverts that invisible edit instead of the
+  // user's last real change. Committing only a changed draft keeps undo on real steps.
+  const commit = (value: unknown): void => {
+    if (draft === initial) return;
+    onCommit(value);
+  };
+
   // A remote edit (or an undo) must win over an untouched draft.
   useEffect(() => {
     setDraft(initial);
@@ -105,7 +114,7 @@ export function FieldControl({
         placeholder={field.placeholder ?? ''}
         onChange={(event) => setDraft(event.target.value)}
         onBlur={() =>
-          onCommit(
+          commit(
             field.control === 'multiselect'
               ? draft
                   .split('\n')
@@ -133,13 +142,13 @@ export function FieldControl({
           }
         }}
         onChange={(event) => setDraft(event.target.value)}
-        onBlur={() => onCommit(field.control === 'number' ? Number(draft) : draft)}
+        onBlur={() => commit(field.control === 'number' ? Number(draft) : draft)}
         // Blur alone loses edits: clicking the canvas does not move focus out of the input, so a
         // typed title could vanish. Enter commits, Escape restores the stored value (P4 §5.6).
         onKeyDown={(event) => {
           if (event.key === 'Enter') {
             event.preventDefault();
-            onCommit(field.control === 'number' ? Number(draft) : draft);
+            commit(field.control === 'number' ? Number(draft) : draft);
           } else if (event.key === 'Escape') {
             event.preventDefault();
             setDraft(initial);
