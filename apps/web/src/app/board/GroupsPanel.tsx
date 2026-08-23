@@ -20,6 +20,7 @@ import {
   ungroupSelected,
   type GroupContext,
 } from './groupCommands.ts';
+import type { BoardGroup } from '@nexus/domain';
 
 export interface GroupsPanelProps {
   open: boolean;
@@ -27,10 +28,19 @@ export interface GroupsPanelProps {
   context: GroupContext;
   onClose: () => void;
   onSelect: (ids: readonly string[]) => void;
+  onExport: (group: BoardGroup) => void;
   onNotice: (message: string) => void;
 }
 
-export function GroupsPanel({ open, doc, context, onClose, onSelect, onNotice }: GroupsPanelProps) {
+export function GroupsPanel({
+  open,
+  doc,
+  context,
+  onClose,
+  onSelect,
+  onExport,
+  onNotice,
+}: GroupsPanelProps) {
   if (!open) return null;
   const groups = boardGroups(doc);
 
@@ -78,6 +88,9 @@ export function GroupsPanel({ open, doc, context, onClose, onSelect, onNotice }:
                   onClick={() => onNotice(setGroupLocked(context, group, false))}
                 >
                   Unlock
+                </Button>
+                <Button variant="secondary" onClick={() => onExport(group)}>
+                  Export
                 </Button>
                 <Button
                   variant="secondary"

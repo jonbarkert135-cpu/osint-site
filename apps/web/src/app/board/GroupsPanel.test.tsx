@@ -8,7 +8,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import { GroupsPanel } from './GroupsPanel.tsx';
-import { boardGroups, groupSelected } from './groupCommands.ts';
+import { boardGroups, exportGroup, groupSelected } from './groupCommands.ts';
 
 const NOW = '2026-08-23T00:00:00.000Z';
 
@@ -35,6 +35,7 @@ describe('GroupsPanel', () => {
         context={context}
         onClose={vi.fn()}
         onSelect={vi.fn()}
+        onExport={vi.fn()}
         onNotice={vi.fn()}
       />,
     );
@@ -53,6 +54,7 @@ describe('GroupsPanel', () => {
         context={context}
         onClose={vi.fn()}
         onSelect={onSelect}
+        onExport={vi.fn()}
         onNotice={onNotice}
       />,
     );
@@ -78,6 +80,7 @@ describe('GroupsPanel', () => {
         context={context}
         onClose={vi.fn()}
         onSelect={vi.fn()}
+        onExport={vi.fn()}
         onNotice={vi.fn()}
       />,
     );
@@ -95,9 +98,20 @@ describe('GroupsPanel', () => {
         context={context}
         onClose={vi.fn()}
         onSelect={vi.fn()}
+        onExport={vi.fn()}
         onNotice={vi.fn()}
       />,
     );
     expect(screen.queryByTestId('groups-panel')).not.toBeInTheDocument();
+  });
+  it('exports one group as its own archive', () => {
+    const { doc } = setup(true);
+    const group = boardGroups(doc)[0];
+    if (group === undefined) throw new Error('no group');
+    const archive = exportGroup(doc, group, { appVersion: '1.0.0', now: NOW });
+
+    expect(archive.nodes.map((node) => node.id)).toEqual(['n1', 'n2']);
+    expect(archive.groups).toHaveLength(1);
+    expect(archive.board.title).toContain('Group');
   });
 });

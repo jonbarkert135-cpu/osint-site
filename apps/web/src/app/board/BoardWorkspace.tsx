@@ -20,6 +20,7 @@ import {
   serializeBoardExport,
   NODE_SOFT_LIMIT,
   type ClipSource,
+  type BoardGroup,
 } from '@nexus/domain';
 import { Banner, Button } from '@nexus/ui';
 import type { Engine, Intent } from '@nexus/canvas-engine';
@@ -50,7 +51,7 @@ import { useDropZone } from '../../capture/useDropZone.ts';
 import { useCopyCut } from '../../capture/useCopyCut.ts';
 import { GroupsPanel } from './GroupsPanel.tsx';
 import { LayersPanel } from './LayersPanel.tsx';
-import { groupSelected, ungroupSelected } from './groupCommands.ts';
+import { exportGroup, groupSelected, labelOf, ungroupSelected } from './groupCommands.ts';
 
 import { useRegisterCommands } from '../commands/useRegisterCommands.ts';
 import { AutoArrangePanel } from '../../layout/AutoArrangePanel.tsx';
@@ -405,7 +406,7 @@ export function BoardWorkspace() {
           run: onUngroup,
         },
       ],
-      [onGroup, onUngroup, openLayers],
+      [onGroup, onUngroup, openLayers, openGroups],
     ),
   );
 
@@ -420,7 +421,7 @@ export function BoardWorkspace() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onGroup, onUngroup, openLayers]);
+  }, [onGroup, onUngroup, openLayers, openGroups]);
 
   const addNote = useCallback(() => {
     if (nodeBudget(doc).blocked) {
@@ -470,6 +471,25 @@ export function BoardWorkspace() {
     link.click();
     URL.revokeObjectURL(url);
   }, [doc]);
+
+  /** One group, downloaded as its own archive (§19). */
+  const exportGroupFile = useCallback(
+    (group: BoardGroup) => {
+      const archive = exportGroup(doc, group, {
+        appVersion: APP_VERSION,
+        now: new Date().toISOString(),
+      });
+      const blob = new Blob([serializeBoardExport(archive)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${archive.board.title || 'group'}.raven.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setNotice(`Exported ${String(archive.nodes.length)} cards from ${labelOf(group)}`);
+    },
+    [doc],
+  );
 
   const buildArchive = useCallback(
     () => exportBoard(doc, { appVersion: APP_VERSION, now: new Date().toISOString() }),
@@ -759,6 +779,7 @@ export function BoardWorkspace() {
         context={groupContext()}
         onClose={() => openGroups(false)}
         onSelect={(ids) => setSelectedIds([...ids])}
+        onExport={exportGroupFile}
         onNotice={setNotice}
       />
 

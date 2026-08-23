@@ -14,6 +14,7 @@ import {
   listEdges,
   listNodes,
   makeEdge,
+  groupSelection,
   makeGroup,
   makeNode,
   observeBoard,
@@ -123,6 +124,19 @@ describe('sceneFromDoc', () => {
 });
 
 describe('applyIntent', () => {
+  it('drags a whole group when one of its members is dragged', () => {
+    const doc = board();
+    groupSelection(doc, ['n1', 'n2'], { now: NOW });
+
+    applyIntent(
+      { t: 'move-nodes', deltas: [{ id: 'n1', dx: 10, dy: 5 }], phase: 'end' },
+      context(doc),
+    );
+
+    expect(getNode(doc, 'n1')).toMatchObject({ x: 10, y: 5 });
+    expect(getNode(doc, 'n2')).toMatchObject({ x: 410, y: 5 });
+  });
+
   it('moves nodes by the gesture delta and skips unknown ids', () => {
     const doc = board();
     expect(

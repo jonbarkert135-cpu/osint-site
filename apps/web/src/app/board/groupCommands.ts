@@ -4,12 +4,14 @@
  */
 
 import {
+  exportBoard,
   groupOf,
   groupSelection,
   listGroups,
   ungroup,
   updateGroup,
   updateNode,
+  type BoardExportV1,
   type BoardGroup,
 } from '@nexus/domain';
 import type * as Y from 'yjs';
@@ -79,4 +81,31 @@ export function groupMembers(group: BoardGroup): string[] {
 
 export function labelOf(group: BoardGroup): string {
   return group.label === '' ? 'the group' : group.label;
+}
+
+/**
+ * One group as a standalone archive (§19): the board export, narrowed to the group's members and
+ * the edges between them. Same format as a full export, so it imports back with no special case.
+ */
+export function exportGroup(
+  doc: Y.Doc,
+  group: BoardGroup,
+  options: { appVersion: string; now: string },
+): BoardExportV1 {
+  const archive = exportBoard(doc, options);
+  const members = new Set(group.childIds);
+  const richtext = Object.fromEntries(
+    Object.entries(archive.richtext).filter(([key]) => members.has(key)),
+  );
+  return {
+    ...archive,
+    board: { ...archive.board, title: `${archive.board.title} — ${labelOf(group)}` },
+    nodes: archive.nodes.filter((node) => members.has(node.id)),
+    edges: archive.edges.filter(
+      (edge) => members.has(String(edge.from)) && members.has(String(edge.to)),
+    ),
+    groups: archive.groups.filter((other) => other.id === group.id),
+    order: archive.order.filter((id) => members.has(id)),
+    richtext,
+  };
 }

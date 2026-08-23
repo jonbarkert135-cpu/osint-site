@@ -25,6 +25,7 @@ import {
   listEdges,
   listNodes,
   makeEdge,
+  groupOf,
   moveNodes,
   newId,
   removeEdges,
@@ -120,6 +121,25 @@ function nextWaypoints(
   return insertWaypoint(edge.waypoints, centreOf(source), centreOf(target), intent.at);
 }
 
+/**
+ * A group moves as one object: dragging any member drags its siblings by the same delta (§19).
+ * Members already in the gesture keep their own delta, so a whole-group selection is unaffected.
+ */
+export function withGroupSiblings(
+  doc: Y.Doc,
+  deltas: readonly { id: string; dx: number; dy: number }[],
+): { id: string; dx: number; dy: number }[] {
+  const byId = new Map(deltas.map((delta) => [delta.id, delta] as const));
+  for (const delta of deltas) {
+    const group = groupOf(doc, delta.id);
+    if (group === undefined) continue;
+    for (const childId of group.childIds) {
+      if (!byId.has(childId)) byId.set(childId, { id: childId, dx: delta.dx, dy: delta.dy });
+    }
+  }
+  return [...byId.values()];
+}
+
 /** Applies one engine intent. Returns true when the document changed. */
 export function applyIntent(intent: Intent, context: IntentContext): boolean {
   const changed = applyIntentToDoc(intent, context);
@@ -141,7 +161,7 @@ function applyIntentToDoc(intent: Intent, context: IntentContext): boolean {
       // Interim commits during a drag keep collaborators in sync; the capture timeout merges them
       // into one undo step (08 §2.4).
       if (intent.phase === 'cancel') return false;
-      const moves = intent.deltas
+      const moves = withGroupSiblings(doc, intent.deltas)
         .map((delta) => {
           const node = getNode(doc, delta.id);
           return node === undefined
