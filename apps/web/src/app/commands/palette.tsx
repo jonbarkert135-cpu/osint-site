@@ -38,7 +38,9 @@ export function useShortcut(combo: string, handler: () => void): void {
       if (needsMod !== (event.metaKey || event.ctrlKey)) return;
       if (needsShift !== event.shiftKey) return;
       if (needsAlt !== event.altKey) return;
-      if (isTextEntry(event.target)) return;
+      // Bare keys must not fire while the user is typing; a modifier combo (⌘/Ctrl+K) must, or the
+      // palette becomes unreachable from any field — including the inspector's own inputs.
+      if (!needsMod && isTextEntry(event.target)) return;
       event.preventDefault();
       handler();
     };

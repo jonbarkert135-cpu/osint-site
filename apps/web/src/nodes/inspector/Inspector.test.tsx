@@ -124,6 +124,29 @@ describe('Inspector', () => {
     expect(getNode(doc, ids[0] ?? '')?.tags).toEqual(['osint']);
   });
 
+  it('saves a title on Enter, without needing the field to lose focus', async () => {
+    const { doc, store, ids } = board();
+    const id = ids[0] ?? '';
+    render(<Inspector doc={doc} store={store} selectedIds={[id]} now={() => T0} />);
+
+    const input = screen.getByLabelText('Title');
+    await userEvent.clear(input);
+    await userEvent.type(input, 'acmecorp.com leak{Enter}');
+    expect(getNode(doc, id)?.title).toBe('acmecorp.com leak');
+  });
+
+  it('restores the stored title on Escape', async () => {
+    const { doc, store, ids } = board();
+    const id = ids[0] ?? '';
+    const before = getNode(doc, id)?.title;
+    render(<Inspector doc={doc} store={store} selectedIds={[id]} now={() => T0} />);
+
+    const input = screen.getByLabelText('Title');
+    await userEvent.type(input, ' typo{Escape}');
+    expect(input).toHaveValue(before);
+    expect(getNode(doc, id)?.title).toBe(before);
+  });
+
   it('locks and hides the selected node from the panel', async () => {
     const { doc, store, ids } = board();
     const id = ids[0] ?? '';

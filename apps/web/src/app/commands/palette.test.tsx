@@ -64,12 +64,12 @@ describe('CommandPalette', () => {
     expect(await screen.findByRole('option', { name: /go to settings/i })).toBeInTheDocument();
   });
 
-  it('is ignored while typing in a text input', async () => {
+  it('still opens while the caret sits in a text input (an inspector field, say)', async () => {
     const user = userEvent.setup();
     renderPalette('/', <input aria-label="note" />);
     await user.click(screen.getByLabelText('note'));
     await user.keyboard('{Control>}k{/Control}');
-    expect(screen.queryByRole('option')).not.toBeInTheDocument();
+    expect(await screen.findByRole('option', { name: /go to settings/i })).toBeInTheDocument();
   });
 
   it('filters commands by fuzzy title match', async () => {

@@ -129,6 +129,17 @@ export function FieldControl({
         }}
         onChange={(event) => setDraft(event.target.value)}
         onBlur={() => onCommit(field.control === 'number' ? Number(draft) : draft)}
+        // Blur alone loses edits: clicking the canvas does not move focus out of the input, so a
+        // typed title could vanish. Enter commits, Escape restores the stored value (P4 §5.6).
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            onCommit(field.control === 'number' ? Number(draft) : draft);
+          } else if (event.key === 'Escape') {
+            event.preventDefault();
+            setDraft(initial);
+          }
+        }}
       />
     );
   }
