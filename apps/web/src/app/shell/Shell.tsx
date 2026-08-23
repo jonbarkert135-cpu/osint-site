@@ -6,6 +6,7 @@ import { useRegisterCommands } from '../commands/useRegisterCommands';
 import type { Command } from '../commands/registry';
 import { useBoardStatus } from './boardStatus';
 import { capabilities } from '../../mode/appMode';
+import { PluginNotices } from '../../plugins/PluginNotices';
 
 export type ShellProject = { id: string; name: string; archivedAt?: string | null };
 
@@ -253,6 +254,7 @@ export function Shell({
 
       <StatusBar />
 
+      <PluginNotices />
       <CommandPalette />
     </div>
   );

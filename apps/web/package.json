@@ -18,6 +18,7 @@
     "@nexus/domain": "workspace:*",
     "@nexus/ai": "workspace:*",
     "@nexus/integrations": "workspace:*",
+    "@nexus/plugin-sdk": "workspace:*",
     "@nexus/layout": "workspace:*",
     "@nexus/ui": "workspace:*",
     "@tanstack/react-query": "^5.62.7",

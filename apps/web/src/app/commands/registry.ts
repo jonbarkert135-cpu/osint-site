@@ -22,7 +22,7 @@ export interface CommandContext {
   navigate: (path: string) => void;
 }
 
-export type CommandGroup = 'navigate' | 'project' | 'board' | 'search' | 'help';
+export type CommandGroup = 'navigate' | 'project' | 'board' | 'search' | 'help' | 'plugin';
 
 export interface Command {
   id: string;
