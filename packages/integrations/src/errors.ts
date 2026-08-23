@@ -29,6 +29,7 @@ export type IntegrationErrorCode =
   | 'IMAGE_PULL_TIMEOUT'
   | 'IMAGE_DIGEST_MISMATCH'
   | 'IMAGE_REGISTRY_DENIED'
+  | 'IMAGE_INCOMPATIBLE'
   | 'START_TIMEOUT'
   | 'TOOL_UNAVAILABLE'
   | 'TOOL_EXIT_NONZERO'
@@ -194,6 +195,12 @@ const COPY: Readonly<Record<IntegrationErrorCode, CopyRow>> = {
     what: 'That image registry is not allowed.',
     why: "The tool's image comes from a registry your organization does not trust.",
     action: 'Ask an admin to allow the registry, or remove the tool.',
+    retry: 'never',
+  },
+  IMAGE_INCOMPATIBLE: {
+    what: "That tool image doesn't support this integration.",
+    why: 'The pinned image is missing a command-line option the integration depends on.',
+    action: 'Ask an admin to pin a supported image digest.',
     retry: 'never',
   },
   START_TIMEOUT: {

@@ -2,6 +2,7 @@
 
 export * from './registry.ts';
 export * from './errors.ts';
+export * from './capabilities.ts';
 export * from './manifest.ts';
 export * from './pipeline.ts';
 export * from './apply.ts';

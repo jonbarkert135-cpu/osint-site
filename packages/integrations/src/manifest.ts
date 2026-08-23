@@ -158,6 +158,18 @@ export const zExecution = z.discriminatedUnion('kind', [
     runtimeClass: z.enum(['runc', 'gvisor']).default('gvisor'),
     user: z.string().default('65534:65534'),
     readOnlyRootFs: z.literal(true),
+    /**
+     * Optional version/capability probe run once per digest before the first run (13 §3.6).
+     * Declarative so the runner stays tool-agnostic.
+     */
+    capabilityProbe: z
+      .object({
+        versionArgs: z.array(z.string()).default(['--version']),
+        helpArgs: z.array(z.string()).default(['--help']),
+        requiredFlags: z.array(z.string()).default([]),
+        minVersion: z.string().optional(),
+      })
+      .optional(),
   }),
   z.object({
     kind: z.literal('http'),

@@ -145,6 +145,13 @@ export function sherlockManifest(imageDigest: string): IntegrationManifest {
       runtimeClass: 'gvisor',
       user: '65532:65532',
       readOnlyRootFs: true,
+      // §3.6: `--json` is the only result source we trust; an image without it is unusable.
+      capabilityProbe: {
+        versionArgs: ['--version'],
+        helpArgs: ['--help'],
+        requiredFlags: ['--json'],
+        minVersion: SHERLOCK_TOOL_VERSION,
+      },
     },
     parser: {
       module: '@nexus/integrations/sherlock/parser',

@@ -439,3 +439,19 @@ waypoints, bundling, labels), capture/paste-конвейер, undo/redo, все 
 
 Тесты: `apps/runner/test/builtin.spiderfoot-scan.test.ts` (4), `apps/web/src/integrations/components.test.tsx` (сопоставление типов узлов).
 Ограничение: без `SPIDERFOOT_BASE_URL` прогон честно падает `UPSTREAM_UNAVAILABLE`, а не сканирует несуществующий хост.
+
+## Пачка 2 — Sherlock: проба образа и диф повторного запуска (2026-08-23)
+
+Пункт 1 дорожной карты, §3.6 и §6.5 спеки `13_SHERLOCK.md`.
+
+| требование спеки                             | статус | доказательство                                                                                                                                                                                     |
+| -------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Проба версии и флагов образа (§3.6)          | ✅     | манифест объявляет `capabilityProbe`; раннер один раз на digest запускает образ с `--version` и `--help` без сети (`docker run --rm --network none`), результат кэшируется по digest               |
+| Образ без `--json` не запускается (§3.6)     | ✅     | `checkCapabilities()` → ошибка `IMAGE_INCOMPATIBLE` с перечнем недостающих флагов; парсинг человекочитаемого stdout как источника результата не включается никогда                                 |
+| Старый образ — предупреждение, не отказ      | ✅     | версия ниже 0.16.0 даёт строку «predates the version Raven was verified against» в логе прогона, прогон продолжается (парсер работает по форме, а не по версии)                                    |
+| Диф повторного запуска (§6.5)                | 🟡     | движок готов: `packages/integrations/sherlock/diff.ts` (`appeared` / `disappeared` / `becameUnknown` / `siteListDelta` / смена digest), 7 тестов. Экрана дифа в интерфейсе ещё нет — следующий шаг |
+| «Неудачная проверка ≠ исчезновение» (§6.5.3) | ✅     | `claimed → error/unknown` попадает в `becameUnknown`, `claimed → available` — в `disappeared`; тест `never turns a failed check into a disappearance`                                              |
+| Вотчлист (§6.6)                              | ❌     | не начат                                                                                                                                                                                           |
+
+Тесты: `packages/integrations/test/capabilities.test.ts` (6), `apps/runner/test/container.probe.test.ts` (4), `packages/integrations/test/sherlock.diff.test.ts` (7).
+Ограничение: проба выполняется в раннере, поэтому проверена тестами с подставным docker-рантаймом, а не живым образом (в этом окружении docker недоступен).

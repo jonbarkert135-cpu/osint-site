@@ -91,6 +91,7 @@ function runtime(over: Partial<ContainerRuntime> = {}): ContainerRuntime & {
       pulled.push(`${image}@${digest}`);
       return Promise.resolve();
     },
+    probe: () => Promise.resolve(''),
     spawn: () => fakeChild({ stdout: '{"ok":true}', code: 0 }),
     readOutput: () => Promise.resolve(undefined),
     kill: (runId, signal) => {

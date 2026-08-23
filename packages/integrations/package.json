@@ -18,6 +18,7 @@
     "./github/parser": "./github/parser.ts",
     "./sherlock/manifest": "./sherlock/manifest.ts",
     "./sherlock/parser": "./sherlock/parser.ts",
+    "./sherlock/diff": "./sherlock/diff.ts",
     "./spiderfoot/client": "./spiderfoot/client.ts",
     "./spiderfoot/manifest": "./spiderfoot/manifest.ts",
     "./spiderfoot/scan-manifest": "./spiderfoot/scanManifest.ts",

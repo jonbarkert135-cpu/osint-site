@@ -10,12 +10,15 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 
 import {
+  checkCapabilities,
   IntegrationError,
+  parseImageCapabilities,
   payloadFor,
   toErrorPayload,
   type ExecutionLayer,
   type ArtifactRef,
   type ExecutionRequest,
+  type ImageCapabilities,
   type RawRunResult,
 } from '@nexus/integrations';
 
@@ -33,6 +36,8 @@ export interface ContainerRuntime {
     argv: readonly string[],
     env: Readonly<Record<string, string>>,
   ): ChildProcessWithoutNullStreams;
+  /** Runs the image with probe arguments and no network, returning stdout+stderr (13 §3.6). */
+  probe(image: string, digest: string, args: readonly string[], timeoutMs: number): Promise<string>;
   /** Reads a declared output file out of the finished container's workdir. */
   readOutput(runId: string, path: string): Promise<Uint8Array | undefined>;
   kill(runId: string, signal: 'SIGTERM' | 'SIGKILL'): Promise<void>;
@@ -75,6 +80,9 @@ export function dockerRuntime(): ContainerRuntime {
       if (!inspected.includes(digest)) {
         throw new IntegrationError('IMAGE_DIGEST_MISMATCH', { detail: { image } });
       }
+    },
+    async probe(image, digest, args, timeoutMs) {
+      return run(['run', '--rm', '--network', 'none', `${image}@${digest}`, ...args], timeoutMs);
     },
     spawn: (argv, env) =>
       spawn(DOCKER_BIN, [...argv], {
@@ -121,6 +129,57 @@ function registryOf(image: string): string {
   return first.includes('.') || first.includes(':') ? first : 'docker.io';
 }
 
+/** §3.6: probed once per digest, then cached forever — the image cannot change under a digest. */
+const capabilityCache = new Map<string, ImageCapabilities>();
+
+/** Exported for tests; a fresh process starts with an empty cache anyway. */
+export function clearCapabilityCache(): void {
+  capabilityCache.clear();
+}
+
+async function probeCapabilities(
+  deps: ContainerExecutorDeps,
+  execution: Extract<ExecutionRequest['manifest']['execution'], { kind: 'container' }>,
+  probedAt: string,
+): Promise<void> {
+  const spec = execution.capabilityProbe;
+  if (spec === undefined) return;
+  let caps = capabilityCache.get(execution.digest);
+  if (caps === undefined) {
+    const [versionOutput, helpOutput] = await Promise.all([
+      deps.runtime.probe(
+        execution.image,
+        execution.digest,
+        spec.versionArgs,
+        TIMERS.containerStartMs,
+      ),
+      deps.runtime.probe(execution.image, execution.digest, spec.helpArgs, TIMERS.containerStartMs),
+    ]);
+    caps = parseImageCapabilities({
+      imageDigest: execution.digest,
+      versionOutput,
+      helpOutput,
+      probedAt,
+    });
+    capabilityCache.set(execution.digest, caps);
+  }
+  const verdict = checkCapabilities(caps, spec);
+  deps.onStdout?.(
+    `probe: ${caps.versionString ?? 'version unknown'}` +
+      (verdict.warning === null ? '' : ` — ${verdict.warning}`) +
+      '\n',
+  );
+  if (!verdict.ok) {
+    throw new IntegrationError('IMAGE_INCOMPATIBLE', {
+      detail: {
+        image: execution.image,
+        digest: execution.digest,
+        missingFlags: verdict.missingFlags,
+      },
+    });
+  }
+}
+
 export function createContainerExecutor(deps: ContainerExecutorDeps): ExecutionLayer {
   const now = deps.now ?? (() => new Date().toISOString());
   const running = new Map<string, ChildProcessWithoutNullStreams>();
@@ -164,6 +223,7 @@ export function createContainerExecutor(deps: ContainerExecutorDeps): ExecutionL
           });
         }
         await deps.runtime.pull(execution.image, execution.digest, TIMERS.imagePullMs);
+        await probeCapabilities(deps, execution, startedAt);
 
         const rendered = renderCommand(
           request.manifest,
