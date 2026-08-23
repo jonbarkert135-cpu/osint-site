@@ -18,6 +18,7 @@
     "./github/parser": "./github/parser.ts",
     "./sherlock/manifest": "./sherlock/manifest.ts",
     "./sherlock/parser": "./sherlock/parser.ts",
+    "./spiderfoot/client": "./spiderfoot/client.ts",
     "./spiderfoot/manifest": "./spiderfoot/manifest.ts",
     "./spiderfoot/parser": "./spiderfoot/parser.ts",
     "./plugins": "./src/plugins.ts"
