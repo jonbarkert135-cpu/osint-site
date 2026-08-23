@@ -403,7 +403,8 @@
   }
 
   .nx-groups-panel,
-  .nx-layers-panel {
+  .nx-layers-panel,
+  .nx-ask-panel {
     position: absolute;
     inset-block: var(--nx-space-4) auto;
     inset-inline-end: calc(var(--nx-dock-inset, 0px) + var(--nx-space-4));
@@ -419,7 +420,8 @@
   }
 
   .nx-groups-panel header,
-  .nx-layers-panel header {
+  .nx-layers-panel header,
+  .nx-ask-panel header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1387,4 +1389,62 @@
 
 .nx-presentation-slide h2 {
   font: var(--text-display);
+}
+
+@layer components {
+  /* Ask Raven: an input, the detected types, and the plan that input would produce. */
+  .nx-ask-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--nx-space-1);
+    margin-block-end: var(--nx-space-2);
+  }
+
+  .nx-ask-field input {
+    padding: var(--nx-space-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--nx-radius-2);
+    background: var(--surface-2);
+    color: inherit;
+    font: inherit;
+  }
+
+  .nx-ask-kinds {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--nx-space-1);
+    margin-block-end: var(--nx-space-2);
+  }
+
+  .nx-ask-kinds button {
+    padding: 0.15rem var(--nx-space-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--nx-radius-pill, 999px);
+    background: var(--surface-2);
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .nx-ask-kinds button[aria-pressed='true'] {
+    border-color: var(--accent-9, currentcolor);
+    background: var(--surface-3, var(--surface-2));
+  }
+
+  .nx-ask-plan {
+    display: flex;
+    flex-direction: column;
+    gap: var(--nx-space-2);
+    margin: 0;
+    padding-inline-start: var(--nx-space-4);
+  }
+
+  .nx-ask-plan li {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .nx-ask-step {
+    font-weight: 600;
+  }
 }

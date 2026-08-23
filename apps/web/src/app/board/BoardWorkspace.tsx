@@ -49,6 +49,7 @@ import { PasteToast } from '../../capture/PasteToast.tsx';
 import { captureTransfer, usePaste, type CaptureResult } from '../../capture/usePaste.ts';
 import { useDropZone } from '../../capture/useDropZone.ts';
 import { useCopyCut } from '../../capture/useCopyCut.ts';
+import { AskPanel } from '../../query/AskPanel.tsx';
 import { GroupsPanel } from './GroupsPanel.tsx';
 import { LayersPanel } from './LayersPanel.tsx';
 import { exportGroup, groupSelected, labelOf, ungroupSelected } from './groupCommands.ts';
@@ -110,6 +111,7 @@ export function BoardWorkspace() {
   const [integrationsOpen, setIntegrationsOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [groupsOpen, setGroupsOpen] = useState(false);
+  const [askOpen, setAskOpen] = useState(false);
   const [layersOpen, setLayersOpen] = useState(false);
 
   // Auto Arrange is ephemeral UI state, never document state (P14a, N2).
@@ -469,6 +471,14 @@ export function BoardWorkspace() {
           run: addNote,
         },
         {
+          id: 'board.ask',
+          title: 'Ask Raven…',
+          group: 'board' as const,
+          keywords: ['ask', 'query', 'search', 'investigate', 'plan', 'osint'],
+          when: (ctx: { view: string }) => ctx.view === 'board',
+          run: () => setAskOpen(true),
+        },
+        {
           id: 'board.export',
           title: 'Export board…',
           group: 'board' as const,
@@ -826,6 +836,8 @@ export function BoardWorkspace() {
           <ImportDialog open={importOpen} onOpenChange={setImportOpen} onConfirm={confirmImport} />
         ) : null}
       </Suspense>
+
+      <AskPanel open={askOpen} onClose={() => setAskOpen(false)} />
 
       <GroupsPanel
         open={groupsOpen}

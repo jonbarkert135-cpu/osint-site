@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": [],
+    "lib": ["ES2023"],
+    "noEmit": true
+  },
+  "include": ["src", "test", "vitest.config.ts"]
+}

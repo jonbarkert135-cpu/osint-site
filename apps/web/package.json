@@ -19,6 +19,8 @@
     "@nexus/ai": "workspace:*",
     "@nexus/integrations": "workspace:*",
     "@nexus/plugin-sdk": "workspace:*",
+    "@nexus/query-engine": "workspace:*",
+    "@nexus/transforms": "workspace:*",
     "@nexus/layout": "workspace:*",
     "@nexus/ui": "workspace:*",
     "@tanstack/react-query": "^5.62.7",

@@ -60,3 +60,7 @@ packages/config/vitest/base.ts
 # imported under jsdom. The layout it runs is covered by packages/layout unit tests and the
 # runner tests; the message plumbing is exercised by the e2e J06 journey.
 apps/web/src/layout/layout.worker.ts
+
+# Barrel: re-exports only, and the global vitest exclude drops `**/index.ts` from the report, so
+# the diff gate would otherwise see a 0%-covered file that has no statements to cover.
+packages/query-engine/src/index.ts
