@@ -49,6 +49,7 @@ import { captureTransfer, usePaste, type CaptureResult } from '../../capture/use
 import { useDropZone } from '../../capture/useDropZone.ts';
 import { useCopyCut } from '../../capture/useCopyCut.ts';
 import { GroupsPanel } from './GroupsPanel.tsx';
+import { LayersPanel } from './LayersPanel.tsx';
 import { groupSelected, ungroupSelected } from './groupCommands.ts';
 
 import { useRegisterCommands } from '../commands/useRegisterCommands.ts';
@@ -106,6 +107,7 @@ export function BoardWorkspace() {
   const [integrationsOpen, setIntegrationsOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [groupsOpen, setGroupsOpen] = useState(false);
+  const [layersOpen, setLayersOpen] = useState(false);
 
   // Auto Arrange is ephemeral UI state, never document state (P14a, N2).
   const arrangeOpen = useAutoArrangeStore((state) => state.open);
@@ -115,14 +117,30 @@ export function BoardWorkspace() {
   const openGroups = useCallback(
     (open: boolean) => {
       setGroupsOpen(open);
-      if (open) setArrangeOpen(false);
+      if (open) {
+        setArrangeOpen(false);
+        setLayersOpen(false);
+      }
     },
     [setArrangeOpen],
   );
   const openArrange = useCallback(
     (open: boolean) => {
       setArrangeOpen(open);
-      if (open) setGroupsOpen(false);
+      if (open) {
+        setGroupsOpen(false);
+        setLayersOpen(false);
+      }
+    },
+    [setArrangeOpen],
+  );
+  const openLayers = useCallback(
+    (open: boolean) => {
+      setLayersOpen(open);
+      if (open) {
+        setGroupsOpen(false);
+        setArrangeOpen(false);
+      }
     },
     [setArrangeOpen],
   );
@@ -370,6 +388,14 @@ export function BoardWorkspace() {
           run: () => openGroups(true),
         },
         {
+          id: 'board.layers',
+          title: 'Layers…',
+          group: 'board' as const,
+          keywords: ['layers', 'hidden', 'objects', 'show', 'lock'],
+          when: (ctx: { view: string }) => ctx.view === 'board',
+          run: () => openLayers(true),
+        },
+        {
           id: 'board.ungroup',
           title: 'Ungroup selection',
           group: 'board' as const,
@@ -379,7 +405,7 @@ export function BoardWorkspace() {
           run: onUngroup,
         },
       ],
-      [onGroup, onUngroup],
+      [onGroup, onUngroup, openLayers],
     ),
   );
 
@@ -394,7 +420,7 @@ export function BoardWorkspace() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onGroup, onUngroup]);
+  }, [onGroup, onUngroup, openLayers]);
 
   const addNote = useCallback(() => {
     if (nodeBudget(doc).blocked) {
@@ -508,6 +534,14 @@ export function BoardWorkspace() {
           data-testid="groups-open"
         >
           Groups
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={() => openLayers(!layersOpen)}
+          aria-expanded={layersOpen}
+          data-testid="layers-open"
+        >
+          Layers
         </Button>
         <Button variant="secondary" onClick={() => setHistoryOpen(true)}>
           Version history
@@ -724,6 +758,15 @@ export function BoardWorkspace() {
         doc={doc}
         context={groupContext()}
         onClose={() => openGroups(false)}
+        onSelect={(ids) => setSelectedIds([...ids])}
+        onNotice={setNotice}
+      />
+
+      <LayersPanel
+        open={layersOpen}
+        doc={doc}
+        context={groupContext()}
+        onClose={() => openLayers(false)}
         onSelect={(ids) => setSelectedIds([...ids])}
         onNotice={setNotice}
       />

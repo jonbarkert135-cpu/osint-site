@@ -396,7 +396,8 @@
     display: none;
   }
 
-  .nx-groups-panel {
+  .nx-groups-panel,
+  .nx-layers-panel {
     position: absolute;
     inset-block: var(--nx-space-4) auto;
     inset-inline-end: calc(var(--nx-dock-inset, 0px) + var(--nx-space-4));
@@ -411,7 +412,8 @@
     z-index: 5;
   }
 
-  .nx-groups-panel header {
+  .nx-groups-panel header,
+  .nx-layers-panel header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -419,7 +421,8 @@
     margin-block-end: var(--nx-space-2);
   }
 
-  .nx-groups-list {
+  .nx-groups-list,
+  .nx-layers-list {
     display: flex;
     flex-direction: column;
     gap: var(--nx-space-2);
@@ -428,16 +431,23 @@
     list-style: none;
   }
 
-  .nx-groups-list li {
+  .nx-groups-list li,
+  .nx-layers-list li {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--nx-space-2);
   }
 
-  .nx-groups-label {
+  .nx-groups-label,
+  .nx-layers-title {
     flex: 1 1 8rem;
     font-weight: 600;
+  }
+
+  .nx-layers-list li[data-hidden='true'] .nx-layers-title {
+    opacity: 0.6;
+    text-decoration: line-through;
   }
 
   .nx-zoom-cluster {
