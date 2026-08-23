@@ -27,7 +27,7 @@ test.describe('J04a — canvas selection and drag', () => {
     await page.getByLabel(/name/i).fill(`Board ${unique()}`);
     await page.getByRole('button', { name: /^create$/i }).click();
 
-    const canvas = page.locator('canvas').first();
+    const canvas = page.getByTestId('canvas-surface');
     await expect(canvas).toBeVisible();
     await expect(page.getByText(/paste a link, drop a file/i)).toBeVisible();
 

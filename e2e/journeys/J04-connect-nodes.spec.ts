@@ -28,7 +28,7 @@ test.describe('J04 — connect two nodes', () => {
     await page.getByLabel(/name/i).fill(`Board ${unique()}`);
     await page.getByRole('button', { name: /^create$/i }).click();
 
-    const canvas = page.locator('canvas').first();
+    const canvas = page.getByTestId('canvas-surface');
     await expect(canvas).toBeVisible();
 
     // Two notes. They land near the viewport centre, offset from each other by the placement rule.

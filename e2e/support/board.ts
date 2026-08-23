@@ -52,7 +52,7 @@ export async function openNewBoard(page: Page): Promise<string> {
   await page.getByRole('button', { name: /^create$/i }).click();
 
   await expect(page).toHaveURL(/\/b\//);
-  await expect(page.locator('canvas')).toBeVisible();
+  await expect(page.getByTestId('canvas-surface')).toBeVisible();
   await expect(page.getByTestId('node-count')).toBeVisible();
   return page.url();
 }

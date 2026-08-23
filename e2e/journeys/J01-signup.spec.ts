@@ -31,10 +31,10 @@ test('signup creates an account, a project, a board and an empty canvas', async 
   await page.getByRole('button', { name: /^create$/i }).click();
 
   await expect(page).toHaveURL(/\/b\//);
-  await expect(page.locator('canvas')).toBeVisible();
+  await expect(page.getByTestId('canvas-surface')).toBeVisible();
 
   // Session survives a reload — no flash of the unauthenticated shell (N2 groundwork).
   await page.reload();
-  await expect(page.locator('canvas')).toBeVisible();
+  await expect(page.getByTestId('canvas-surface')).toBeVisible();
   await expect(page).not.toHaveURL(/\/login/);
 });
