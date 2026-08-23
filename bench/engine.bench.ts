@@ -5,6 +5,7 @@
 // GPU rasterization, DOM layout and browser memory: those need a real Chromium and stay in
 // canvas.bench.ts. Reporting a Node number as if it were the browser metric would be a lie, so the
 // two sets are kept separate and labelled.
+import v8 from 'node:v8';
 import { createEngine, type Engine, type SceneSnapshot } from '@nexus/canvas-engine';
 import { createManualClock, createRecordingTarget } from '@nexus/canvas-engine/testing';
 import type { Metric, MetricKey } from './harness.ts';
@@ -68,8 +69,14 @@ function timed(fn: () => void): number {
 }
 
 export function runEngineBenches(): Partial<Record<MetricKey, Metric>> {
+  const heapBefore = v8.getHeapStatistics().used_heap_size;
   const scene = scene5000();
   const { engine, clock } = boot(scene);
+  // memory-5000: what the 5,000-node scene plus a booted engine costs in heap. Node, not the
+  // browser, so it excludes GPU and DOM — the note says so rather than passing it off as the
+  // browser figure.
+  const heapAfter = v8.getHeapStatistics().used_heap_size;
+  const memoryMb = (heapAfter - heapBefore) / (1024 * 1024);
 
   // first-interactive: constructing the engine over a 5,000-node board and painting frame one.
   const firstPaint = timed(() => {
@@ -131,6 +138,12 @@ export function runEngineBenches(): Partial<Record<MetricKey, Metric>> {
       unit: 'ms',
       budget: BUDGETS['select-all-5000'],
       note,
+    },
+    'memory-5000': {
+      value: memoryMb,
+      unit: 'MB',
+      budget: BUDGETS['memory-5000'],
+      note: `${note}; heap delta for the scene and a booted engine`,
     },
     'drag-200-selected': {
       value: percentile(dragFrames, 95),

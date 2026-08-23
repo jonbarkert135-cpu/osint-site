@@ -94,6 +94,11 @@ export function createBoardHistory(doc: Y.Doc, options: CreateHistoryOptions = {
     if (manager.undoStack.length > stackLimit) {
       manager.undoStack.splice(0, manager.undoStack.length - stackLimit);
     }
+    // The redo stack is unbounded too: undoing a long session moved every step into it and the
+    // heap kept growing (measured in a browser, 2026-08-23). Same cap, same reason.
+    if (manager.redoStack.length > stackLimit) {
+      manager.redoStack.splice(0, manager.redoStack.length - stackLimit);
+    }
     state.canUndo = manager.undoStack.length > 0;
     state.canRedo = manager.redoStack.length > 0;
     state.undoDepth = manager.undoStack.length;

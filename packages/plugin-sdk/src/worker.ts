@@ -14,7 +14,7 @@
  * ```
  */
 
-import { runPlugin, type PluginModule, type PluginTransport } from './index.ts';
+import { runPlugin, type PluginModule, type PluginTransport } from './plugin.ts';
 
 interface WorkerScope {
   postMessage(message: unknown): void;

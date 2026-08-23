@@ -97,6 +97,12 @@
     color: var(--fg-muted);
   }
 
+  /* The palette hint sits on the dialog surface, where --fg-muted falls under 4.5:1 (axe:
+     color-contrast). It is secondary information, so it keeps the smaller size but a readable hue. */
+  .nx-palette-hint {
+    color: var(--fg-secondary);
+  }
+
   /* ------------------------------------------------------------ page shells */
 
   /* A routed page inside the surface: its own scroll container, so the shell never scrolls. */
@@ -1197,6 +1203,14 @@
       white-space: nowrap;
     }
 
+    /* The rail content is a vertical stack on desktop; as a horizontal strip it must
+       lay out in one line, otherwise the projects list eats the canvas height. */
+    .nx-rail .nx-stack {
+      flex-direction: row;
+      align-items: center;
+      margin: 0;
+    }
+
     .nx-board-main > .nx-inspector {
       max-inline-size: 40vw;
     }
@@ -1230,8 +1244,35 @@
       display: none;
     }
 
+    /* On a phone the board is the canvas: the bar scrolls sideways in one line instead of
+       wrapping into four rows, and the counter (repeated in the status bar) is dropped. */
+    /* A sideways-scrolling bar must not widen its ancestors, or the canvas grows past the
+       screen and the zoom controls end up off it. */
+    .nx-surface,
+    .nx-board,
+    .nx-board-main,
     .nx-board-bar {
-      flex-wrap: wrap;
+      min-inline-size: 0;
+    }
+
+    .nx-board-bar {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: none;
+    }
+
+    .nx-board-bar > * {
+      flex: 0 0 auto;
+    }
+
+    .nx-board-bar > [data-testid='node-count'] {
+      display: none;
+    }
+
+    /* Nothing selected means the sheet has nothing to show — it would just cover the canvas. */
+    .nx-board-main > .nx-inspector[data-empty='true'] {
+      display: none;
     }
 
     .nx-zoom-cluster {

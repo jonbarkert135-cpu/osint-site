@@ -280,23 +280,26 @@ export function CommandPalette() {
             {query.trim() === '' ? 'No commands yet' : 'Nothing matches that here'}
           </p>
         ) : (
-          <ul id="nx-palette-list" role="listbox" className="nx-stack">
+          // A listbox may only contain options: the <li> wrappers broke that (axe: listitem,
+          // aria-required-parent/children), so the option buttons are direct children.
+          <div id="nx-palette-list" role="listbox" className="nx-stack">
             {rows.map((row, index) => (
-              <li key={row.key}>
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={index === activeIndex}
-                  data-active={index === activeIndex}
-                  onClick={() => choose(row)}
-                  onMouseEnter={() => setActiveIndex(index)}
-                >
-                  <span>{row.label}</span>
-                  {row.hint !== undefined ? <span className="nx-muted">{row.hint}</span> : null}
-                </button>
-              </li>
+              <button
+                key={row.key}
+                type="button"
+                role="option"
+                aria-selected={index === activeIndex}
+                data-active={index === activeIndex}
+                onClick={() => choose(row)}
+                onMouseEnter={() => setActiveIndex(index)}
+              >
+                <span>{row.label}</span>
+                {row.hint !== undefined ? (
+                  <span className="nx-palette-hint">{row.hint}</span>
+                ) : null}
+              </button>
             ))}
-          </ul>
+          </div>
         )}
       </div>
     </Dialog>

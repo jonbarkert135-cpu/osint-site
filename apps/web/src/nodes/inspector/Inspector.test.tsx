@@ -69,6 +69,8 @@ describe('Inspector', () => {
     render(<Inspector doc={doc} store={store} selectedIds={[]} now={() => T0} />);
     expect(screen.getByText(/Select a node to see its details/)).toBeInTheDocument();
     expect(screen.getByText('2 nodes · 0 connections')).toBeInTheDocument();
+    // The mobile bottom sheet hides itself on this flag so an empty panel never covers the canvas.
+    expect(screen.getByTestId('inspector')).toHaveAttribute('data-empty', 'true');
   });
 
   it('renders the type fields from the registry descriptors', () => {

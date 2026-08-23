@@ -33,6 +33,7 @@ packages/transforms/src/sdk/index.ts
 packages/integrations/src/index.ts
 packages/ai/src/index.ts
 packages/ui/src/index.ts
+packages/plugin-sdk/src/index.ts
 
 # Parser registry: re-exports plus two one-line dispatch helpers, fully exercised by
 # test/github.parsers.test.ts, but vitest's global `**/index.ts` coverage exclude means v8 emits

@@ -85,9 +85,9 @@ function NodeCardImpl({
         <span className="nx-card-type" style={{ color: `var(${def.glyph.colorToken})` }}>
           <NodeIcon icon={def.glyph.icon} />
         </span>
-        <h3 className="nx-card-title" data-clamp="2">
+        <h2 className="nx-card-title" data-clamp="2">
           {node.title === '' ? `Untitled ${def.label.toLowerCase()}` : node.title}
-        </h3>
+        </h2>
         {node.locked ? (
           <span className="nx-chip" data-kind="locked">
             Locked

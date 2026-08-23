@@ -155,6 +155,17 @@ describe('undo/redo', () => {
     expect(h.state.undoDepth).toBe(UNDO_STACK_LIMIT);
     h.destroy();
   });
+
+  it('caps the redo stack at 200 items as well', () => {
+    const doc = createBoardDoc({ boardId: 'b_cap_redo', now: T0 });
+    const h = history(doc);
+    for (let i = 0; i < UNDO_STACK_LIMIT + 25; i += 1) {
+      addNodes(doc, [makeNode({ id: `n${String(i)}`, x: i, y: 0 }, T0)], local);
+    }
+    for (let i = 0; i < UNDO_STACK_LIMIT; i += 1) h.undo();
+    expect(h.state.redoDepth).toBe(UNDO_STACK_LIMIT);
+    h.destroy();
+  });
 });
 
 describe('extra tracked origins', () => {

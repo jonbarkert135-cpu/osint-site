@@ -156,6 +156,7 @@ export function Inspector({
         style={panelStyle}
         aria-label="Details"
         data-testid="inspector"
+        data-empty="true"
       >
         <header className="nx-inspector-head">
           <h2>Board</h2>
