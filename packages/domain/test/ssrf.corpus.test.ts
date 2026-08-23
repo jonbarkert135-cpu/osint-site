@@ -124,6 +124,39 @@ describe('safeFetch', () => {
     expect(Object.keys(captured.headers)).not.toContain('authorization');
   });
 
+  it('sends a POST body through the same policy path', async () => {
+    let seen: { method: string | undefined; body: string | undefined } | null = null;
+    await safeFetch('https://example.com/', {
+      resolve: publicResolver,
+      transport: async (request) => {
+        seen = { method: request.method, body: request.body };
+        return okTransport(request);
+      },
+      method: 'POST',
+      body: 'scanname=raven',
+    });
+    const captured = seen as unknown as { method: string; body: string };
+    expect(captured.method).toBe('POST');
+    expect(captured.body).toBe('scanname=raven');
+  });
+
+  it('refuses to follow a redirect on a POST instead of replaying the body', async () => {
+    const redirecting: Transport = async () => ({
+      status: 302,
+      headers: { get: (name) => (name === 'location' ? 'https://elsewhere.example/' : null) },
+      body: async function* () {},
+    });
+    const code = await rejection(
+      safeFetch('https://example.com/', {
+        resolve: publicResolver,
+        transport: redirecting,
+        method: 'POST',
+        body: 'x=1',
+      }),
+    );
+    expect(code).toBe('http_error');
+  });
+
   it('blocks a redirect to a private address at the hop', async () => {
     const redirecting: Transport = async (request) =>
       request.url.hostname === 'example.com'

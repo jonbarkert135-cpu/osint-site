@@ -16,7 +16,8 @@ export const nodeResolver: Resolver = async (hostname) => {
 
 export const nodeTransport: Transport = async (request): Promise<TransportResponse> => {
   const response = await fetch(request.url, {
-    method: 'GET',
+    method: request.method ?? 'GET',
+    ...(request.body === undefined ? {} : { body: request.body }),
     headers: { ...request.headers },
     redirect: 'manual',
     credentials: 'omit',

@@ -22,6 +22,9 @@ export interface TransportRequest {
   readonly pinned: PinnedHost;
   readonly headers: Readonly<Record<string, string>>;
   readonly signal: AbortSignal;
+  /** GET unless the caller asked for a write; the transport must send exactly this. */
+  readonly method?: 'GET' | 'POST';
+  readonly body?: string | undefined;
 }
 
 export interface TransportResponse {
@@ -43,6 +46,12 @@ export interface SafeFetchOptions {
   readonly signal?: AbortSignal | undefined;
   /** Extra request headers; opt-in, for integrations that must authenticate (10_INTEGRATIONS §4.1). */
   readonly headers?: Readonly<Record<string, string>> | undefined;
+  /**
+   * `POST` is opt-in and never redirected: a write that a redirect could replay is a way to send
+   * the body to a host the caller never validated, so a 3xx on a POST is refused outright.
+   */
+  readonly method?: 'GET' | 'POST' | undefined;
+  readonly body?: string | undefined;
 }
 
 export interface SafeFetchResult {
@@ -90,12 +99,20 @@ export async function safeFetch(
             ...(options.headers ?? {}),
           },
           signal: controller.signal,
+          method: options.method ?? 'GET',
+          ...(options.body === undefined ? {} : { body: options.body }),
         });
       } catch (error) {
         throw controller.signal.aborted ? new UrlRejected('timeout') : toRejection(error);
       }
 
       if (response.status >= 300 && response.status < 400) {
+        if ((options.method ?? 'GET') === 'POST') {
+          throw new UrlRejected(
+            'http_error',
+            'The host redirected a POST; the body was not resent.',
+          );
+        }
         const location = response.headers.get('location');
         if (location === null) throw new UrlRejected('http_error');
         target = new URL(location, url).href;

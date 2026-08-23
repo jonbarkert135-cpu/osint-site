@@ -107,9 +107,23 @@ export function createHttpExecutor(deps: HttpExecutorDeps): ExecutionLayer {
           }
 
           egressRequests += 1;
+          const body =
+            spec.method === 'POST' && spec.body !== undefined
+              ? renderTemplate(
+                  typeof spec.body === 'string' ? spec.body : JSON.stringify(spec.body),
+                  {
+                    input,
+                    workdir: '/',
+                    runId: request.runId,
+                    secretDir: '/run/secrets',
+                  },
+                ).join('')
+              : undefined;
           const response = await safeFetch(url.toString(), {
             resolve: deps.resolve,
             transport: deps.transport,
+            method: spec.method,
+            ...(body === undefined ? {} : { body }),
             headers,
             signal: controller.signal,
             maxBytes: Math.min(budget, request.limits.maxOutputBytes),
