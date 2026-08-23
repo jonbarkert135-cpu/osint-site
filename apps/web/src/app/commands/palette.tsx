@@ -82,14 +82,18 @@ export function CommandPalette() {
   const role = useWorkspaceRole();
   const boardStatus = useBoardStatus();
 
-  const view: CommandContext['view'] =
-    params.boardId !== undefined || location.pathname.startsWith('/b/')
-      ? 'board'
-      : params.projectId !== undefined
-        ? 'project'
-        : location.pathname.startsWith('/settings')
-          ? 'settings'
-          : 'shell';
+  // A board is "open" whenever one is on screen — including the default board at `/`, which has no
+  // `/b/:boardId` in the path. Keying only off the route hid every board command there, so the
+  // palette answered "No commands yet" on the one page users open first (P7 §5.8).
+  const view: CommandContext['view'] = location.pathname.startsWith('/settings')
+    ? 'settings'
+    : params.projectId !== undefined
+      ? 'project'
+      : params.boardId !== undefined ||
+          location.pathname.startsWith('/b/') ||
+          boardStatus.boardId !== null
+        ? 'board'
+        : 'shell';
 
   const context: CommandContext = useMemo(
     () => ({
@@ -141,6 +145,28 @@ export function CommandPalette() {
       );
     };
 
+    const placeRows = (): Row[] => {
+      const needle = term.toLowerCase();
+      if (needle.trim() === '') return [];
+      const projectRows: Row[] = (projects.data ?? [])
+        .filter((p) => p.name.toLowerCase().includes(needle))
+        .map((p) => ({
+          key: `p:${p.id}`,
+          label: p.name,
+          hint: 'project',
+          run: () => void navigate(`/p/${p.id}`),
+        }));
+      const boardRows: Row[] = (boards.data ?? [])
+        .filter((b) => b.title.toLowerCase().includes(needle))
+        .map((b) => ({
+          key: `b:${b.id}`,
+          label: b.title,
+          hint: 'board',
+          run: () => void navigate(`/b/${b.id}`),
+        }));
+      return [...boardRows, ...projectRows];
+    };
+
     if (mode === 'commands') {
       const commandRows = commandRegistry.search(term, context).map(
         (command): Row => ({
@@ -155,7 +181,7 @@ export function CommandPalette() {
       );
       // A bare query searches the board too: typing a domain or a name should find the node
       // that holds it, without knowing the `@` prefix first (00_GOAL: findable evidence).
-      return query.startsWith('>') ? commandRows : [...commandRows, ...nodeRows(8)];
+      return query.startsWith('>') ? commandRows : [...commandRows, ...nodeRows(8), ...placeRows()];
     }
 
     if (mode === 'help') {
@@ -180,24 +206,28 @@ export function CommandPalette() {
 
     if (mode === 'nodes') return nodeRows(20);
 
-    // mode === 'switch': projects, then (once one is in view) its boards.
-    const projectRows: Row[] = (projects.data ?? [])
-      .filter((p) => p.name.toLowerCase().includes(term.toLowerCase()))
-      .map((p) => ({
-        key: `p:${p.id}`,
-        label: p.name,
-        hint: 'project',
-        run: () => navigate(`/p/${p.id}`),
-      }));
-    const boardRows: Row[] = (boards.data ?? [])
-      .filter((b) => b.title.toLowerCase().includes(term.toLowerCase()))
-      .map((b) => ({
-        key: `b:${b.id}`,
-        label: b.title,
-        hint: 'board',
-        run: () => navigate(`/b/${b.id}`),
-      }));
-    return [...boardRows, ...projectRows];
+    // mode === 'switch': projects, then (once one is in view) its boards. An empty term lists
+    // everything, so `Ctrl+P` on its own is still a plain switcher.
+    if (term.trim() === '')
+      return [
+        ...(boards.data ?? []).map(
+          (b): Row => ({
+            key: `b:${b.id}`,
+            label: b.title,
+            hint: 'board',
+            run: () => void navigate(`/b/${b.id}`),
+          }),
+        ),
+        ...(projects.data ?? []).map(
+          (p): Row => ({
+            key: `p:${p.id}`,
+            label: p.name,
+            hint: 'project',
+            run: () => void navigate(`/p/${p.id}`),
+          }),
+        ),
+      ];
+    return placeRows();
   }, [open, mode, term, query, context, boardStatus, projects.data, boards.data, navigate]);
 
   const choose = (row: Row | undefined) => {
@@ -246,7 +276,9 @@ export function CommandPalette() {
           {rows.length} {rows.length === 1 ? 'result' : 'results'}
         </div>
         {rows.length === 0 ? (
-          <p className="nx-muted">No commands yet</p>
+          <p className="nx-muted">
+            {query.trim() === '' ? 'No commands yet' : 'Nothing matches that here'}
+          </p>
         ) : (
           <ul id="nx-palette-list" role="listbox" className="nx-stack">
             {rows.map((row, index) => (

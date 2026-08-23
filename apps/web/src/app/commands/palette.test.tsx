@@ -35,12 +35,12 @@ function PublishBoard({ index }: { index: ReturnType<typeof createLocalIndex> })
   return null;
 }
 
-function renderPaletteWithBoard(index: ReturnType<typeof createLocalIndex>) {
+function renderPaletteWithBoardAt(path: string, index: ReturnType<typeof createLocalIndex>) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
       <WorkspaceProvider repository={fakeWorkspaceRepository()}>
-        <MemoryRouter initialEntries={['/b/b1']}>
+        <MemoryRouter initialEntries={[path]}>
           <BoardStatusProvider>
             <PublishBoard index={index} />
             <CommandPalette />
@@ -126,10 +126,33 @@ describe('CommandPalette', () => {
       body: 'contact@acme-corp.io',
       keywords: ['target'],
     });
-    renderPaletteWithBoard(index);
+    renderPaletteWithBoardAt('/b/b1', index);
     await user.keyboard('{Control>}k{/Control}');
     await user.type(screen.getByRole('textbox', { name: 'Command palette' }), 'acme');
     expect(await screen.findByRole('option', { name: /acme corp/i })).toBeInTheDocument();
+  });
+
+  it('shows board commands on the default board, which has no /b/ in its path', async () => {
+    commandRegistry.register({
+      id: 'test.board',
+      title: 'Board only action',
+      group: 'board',
+      when: (ctx) => ctx.view === 'board',
+      run: () => undefined,
+    });
+    const user = userEvent.setup();
+    renderPaletteWithBoardAt('/', createLocalIndex());
+    await user.keyboard('{Control>}k{/Control}');
+    expect(await screen.findByRole('option', { name: /board only action/i })).toBeInTheDocument();
+    commandRegistry.unregister('test.board');
+  });
+
+  it('finds a project by name from a bare query', async () => {
+    const user = userEvent.setup();
+    renderPalette();
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(screen.getByRole('textbox', { name: 'Command palette' }), 'atlas');
+    expect(await screen.findByRole('option', { name: /atlas/i })).toBeInTheDocument();
   });
 
   it('switches to help mode with "?"', async () => {

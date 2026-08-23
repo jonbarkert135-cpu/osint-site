@@ -4,7 +4,15 @@
  * clear, and the effect tears itself down without leaking the idle callback.
  */
 
-import { addNode, createBoardDoc, makeNode, removeNodes, updateNode } from '@nexus/domain';
+import {
+  addEdge,
+  addNode,
+  createBoardDoc,
+  makeEdge,
+  makeNode,
+  removeNodes,
+  updateNode,
+} from '@nexus/domain';
 import { renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -27,6 +35,23 @@ describe('useBoardSearchIndex', () => {
 
     expect(result.current.search('Alpha').map((r) => r.id)).toEqual(['n1']);
     expect(result.current.search('Bravo').map((r) => r.id)).toEqual(['n2']);
+  });
+
+  it('finds a node by the label of an edge that touches it', () => {
+    const doc = createBoardDoc({ boardId: 'b1', title: 'Board', now: NOW });
+    addNode(doc, makeNode({ id: 'n1', x: 0, y: 0, title: 'Kilo' }, NOW), ORIGIN);
+    addNode(doc, makeNode({ id: 'n2', x: 10, y: 10, title: 'Lima' }, NOW), ORIGIN);
+
+    const { result } = renderHook(() => useBoardSearchIndex(doc, 'b1'));
+    expect(result.current.search('registrar')).toEqual([]);
+
+    addEdge(doc, makeEdge({ id: 'e1', from: 'n1', to: 'n2', label: 'registrar' }, NOW), ORIGIN);
+    expect(
+      result.current
+        .search('registrar')
+        .map((r) => r.id)
+        .sort(),
+    ).toEqual(['n1', 'n2']);
   });
 
   it('upserts new nodes and removes deleted ones as the doc changes', () => {

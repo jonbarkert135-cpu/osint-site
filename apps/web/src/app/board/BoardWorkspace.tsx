@@ -101,6 +101,8 @@ export function BoardWorkspace() {
   const [notice, setNotice] = useState<string | null>(null);
   const [budgetWarning, setBudgetWarning] = useState(false);
   const [counts, setCounts] = useState({ nodes: 0, edges: 0 });
+  /** The board's tags, as one sorted string — a primitive an effect can depend on cheaply. */
+  const [tagKey, setTagKey] = useState('');
   const [selectedIds, setSelectedIds] = useState<readonly string[]>([]);
   const [inspectorWidth, setInspectorWidth] = useState(360);
   const [focusTitleFor, setFocusTitleFor] = useState<string | undefined>(undefined);
@@ -234,8 +236,14 @@ export function BoardWorkspace() {
     for (const node of scene.nodes) engine.applyScenePatch({ op: 'upsert-node', node });
     for (const edge of scene.edges) engine.applyScenePatch({ op: 'upsert-edge', edge });
     setCounts({ nodes: countEntities(doc).nodes, edges: countEntities(doc).edges });
+    const readTagKey = (): string =>
+      [...new Set(listNodes(doc).flatMap((n) => n.tags))].sort().join('\u0000');
+    setTagKey(readTagKey());
 
     return observeBoard(doc, (change) => {
+      // Tags first: adding one changes no geometry, so it must not ride on the patch path below,
+      // or the palette's `#` mode never sees it (P7 §9).
+      setTagKey(readTagKey());
       const patches = patchesFromChange(doc, change);
       if (patches.length === 0) return;
       engine.applyScenePatch({ op: 'bulk', patches });
@@ -249,12 +257,12 @@ export function BoardWorkspace() {
 
   // The status bar belongs to the shell but the numbers belong here (see shell/boardStatus).
   useEffect(() => {
-    boardStatus.publish({ counts, tags: [...new Set(listNodes(doc).flatMap((n) => n.tags))] });
+    boardStatus.publish({ counts, tags: tagKey === '' ? [] : tagKey.split('\u0000') });
     // Denormalized counters (P7 §5.1): the client reports what it just saved; local/server clamp.
     reportCounts(boardId, counts.nodes, counts.edges);
     // `publish` is stable enough for this: it de-duplicates identical values itself.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [counts.nodes, counts.edges]);
+  }, [counts.nodes, counts.edges, tagKey]);
 
   // The board's search index (P7 §5) and the camera-jump-and-pulse the palette/search use.
   const focusNode = useCallback(
@@ -271,6 +279,9 @@ export function BoardWorkspace() {
   );
   useEffect(() => {
     boardStatus.publish({ boardId, searchIndex, focusNode });
+    // Leaving the board clears it, or the palette would still think one is open (its board
+    // commands are gated on that) on the project and settings pages.
+    return () => boardStatus.publish({ boardId: null, searchIndex: null, focusNode: null });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boardId, searchIndex, focusNode]);
 
@@ -442,6 +453,49 @@ export function BoardWorkspace() {
     // `context` is rebuilt every render on purpose: it only holds the doc, history and clock.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc, history, engine]);
+
+  // The rest of the board bar, as commands (P7 §5.8: every visible action is reachable from the
+  // palette). Same handlers as the buttons above them, so the two cannot drift apart.
+  useRegisterCommands(
+    useMemo(
+      () => [
+        {
+          id: 'board.addNote',
+          title: 'Add note',
+          group: 'board' as const,
+          keywords: ['new', 'create', 'node', 'card'],
+          shortcut: 'N',
+          when: (ctx: { view: string }) => ctx.view === 'board',
+          run: addNote,
+        },
+        {
+          id: 'board.export',
+          title: 'Export board…',
+          group: 'board' as const,
+          keywords: ['export', 'download', 'report', 'json', 'png'],
+          when: (ctx: { view: string }) => ctx.view === 'board',
+          run: () => setExportOpen(true),
+        },
+        {
+          id: 'board.import',
+          title: 'Import…',
+          group: 'board' as const,
+          keywords: ['import', 'upload', 'csv', 'json'],
+          when: (ctx: { view: string }) => ctx.view === 'board',
+          run: () => setImportOpen(true),
+        },
+        ...VIEW_MODES.map((value) => ({
+          id: `view.${value}`,
+          title: `View: ${VIEW_LABELS[value]}`,
+          group: 'board' as const,
+          keywords: ['view', 'mode', 'switch', 'projection', VIEW_LABELS[value].toLowerCase()],
+          when: (ctx: { view: string }) => ctx.view === 'board',
+          run: () => setViewMode(value),
+        })),
+      ],
+      [addNote],
+    ),
+  );
 
   const importAsList = useCallback(() => {
     if (capture === null) return;

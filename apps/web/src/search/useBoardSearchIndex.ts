@@ -9,6 +9,7 @@ import {
   builtinNodeTypes,
   createLocalIndex,
   getNode,
+  listEdges,
   listNodes,
   observeBoard,
 } from '@nexus/domain';
@@ -45,6 +46,17 @@ export function useBoardSearchIndex(doc: Y.Doc, boardId: string): LocalIndex {
     let cancelled = false;
     let cancelIdle = () => undefined as void;
 
+    /**
+     * A node's own fields plus the labels and types of the edges touching it, so searching a
+     * relationship ("owns", "registered_by") finds the nodes it connects (P7 §5: links are
+     * evidence too). Edges have no card of their own to jump to, and their endpoints do.
+     */
+    const edgeTerms = (nodeId: string): string[] =>
+      listEdges(doc)
+        .filter((edge) => edge.source.nodeId === nodeId || edge.target.nodeId === nodeId)
+        .flatMap((edge) => [edge.type, edge.label ?? ''])
+        .filter((term) => term !== '');
+
     const upsertOne = (node: (typeof nodes)[number]): void => {
       const fields = registry.get(node.type).searchFields(node);
       index.upsert({
@@ -52,7 +64,7 @@ export function useBoardSearchIndex(doc: Y.Doc, boardId: string): LocalIndex {
         boardId,
         title: fields.title,
         body: fields.body,
-        keywords: fields.keywords,
+        keywords: [...fields.keywords, ...edgeTerms(node.id)],
       });
     };
 
@@ -68,19 +80,15 @@ export function useBoardSearchIndex(doc: Y.Doc, boardId: string): LocalIndex {
     runChunk();
 
     const unsubscribe = observeBoard(doc, (change) => {
-      const registryNow = builtinNodeTypes();
       for (const id of change.nodes.removed) index.remove(id);
       for (const id of change.nodes.upserted) {
         const node = getNode(doc, id);
-        if (node === undefined) continue;
-        const fields = registryNow.get(node.type).searchFields(node);
-        index.upsert({
-          id: node.id,
-          boardId,
-          title: fields.title,
-          body: fields.body,
-          keywords: fields.keywords,
-        });
+        if (node !== undefined) upsertOne(node);
+      }
+      // Edge labels live on their endpoints' entries, so any edge change re-indexes the board's
+      // nodes. Edges change far less often than nodes, and this stays O(nodes) per change batch.
+      if (change.edges.upserted.length > 0 || change.edges.removed.length > 0) {
+        for (const node of listNodes(doc)) upsertOne(node);
       }
     });
 
