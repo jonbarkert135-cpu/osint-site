@@ -22,11 +22,13 @@ import { ApplyToast } from './ApplyToast.tsx';
 import { ConsentDialog } from './ConsentDialog.tsx';
 import { IntegrationPicker } from './IntegrationPicker.tsx';
 import { ProposalReview } from './ProposalReview.tsx';
+import { RunDiffSheet } from './RunDiffSheet.tsx';
 import { RunHistory } from './RunHistory.tsx';
 import { RunPanel } from './RunPanel.tsx';
 import { externalRunUrl } from './externalRun.ts';
+import { diffProposals, type RunDiff } from './runDiff.ts';
 import { installedIntegrations } from './useIntegrations.ts';
-import type { IntegrationSummary, RunUiState } from './types.ts';
+import type { IntegrationSummary, RunRow, RunUiState } from './types.ts';
 
 export interface IntegrationsSurfaceProps {
   open: boolean;
@@ -41,7 +43,7 @@ export interface IntegrationsSurfaceProps {
   integrations?: readonly IntegrationSummary[];
 }
 
-type Step = 'picker' | 'consent' | 'run' | 'review';
+type Step = 'picker' | 'consent' | 'run' | 'review' | 'diff';
 
 const ACTIVE_STATES = new Set(['queued', 'starting', 'running', 'parsing']);
 
@@ -65,6 +67,7 @@ export function IntegrationsSurface({
   const [errorCode, setErrorCode] = useState<IntegrationErrorCode | undefined>(undefined);
   const [externalUrl, setExternalUrl] = useState<string | undefined>(undefined);
   const [proposal, setProposal] = useState<ImportProposal | null>(null);
+  const [diff, setDiff] = useState<RunDiff | null>(null);
   const [applied, setApplied] = useState<{
     nodes: number;
     edges: number;
@@ -137,6 +140,23 @@ export function IntegrationsSurface({
     setStep('review');
   }, [runs, current]);
 
+  const showDiff = useCallback(
+    async (run: RunRow, previous: RunRow) => {
+      if (runs === undefined || run.proposalId === null || previous.proposalId === null) return;
+      const [before, after] = await Promise.all([
+        runs.getProposal({ proposalId: previous.proposalId }),
+        runs.getProposal({ proposalId: run.proposalId }),
+      ]);
+      const integration = list.find((item) => item.id === run.integrationId);
+      if (integration !== undefined) setChosen(integration);
+      setDiff(diffProposals(before as ImportProposal, after as ImportProposal));
+      setProposal(after as ImportProposal);
+      setRunId(run.id);
+      setStep('diff');
+    },
+    [runs, list],
+  );
+
   const apply = useCallback(
     (selectedItemIds: string[]) => {
       if (proposal === null || chosen === null) return;
@@ -204,6 +224,15 @@ export function IntegrationsSurface({
         />
       ) : null}
 
+      {step === 'diff' && diff !== null && chosen !== null ? (
+        <RunDiffSheet
+          diff={diff}
+          integrationName={chosen.name}
+          onReviewCurrent={() => setStep('review')}
+          onClose={() => setStep('run')}
+        />
+      ) : null}
+
       {step === 'review' && proposal !== null && chosen !== null ? (
         <ProposalReview
           proposal={proposal}
@@ -227,10 +256,7 @@ export function IntegrationsSurface({
             setStep('consent');
           }
         }}
-        onDiff={(run) => {
-          setRunId(run.id);
-          setStep('run');
-        }}
+        onDiff={(run, previous) => void showDiff(run, previous)}
       />
 
       <ApplyToast

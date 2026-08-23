@@ -17,7 +17,9 @@ import { ApplyToast } from './ApplyToast.tsx';
 import { ConsentDialog, dataLeavingCopy } from './ConsentDialog.tsx';
 import { IntegrationPicker, accepts } from './IntegrationPicker.tsx';
 import { ProposalReview, defaultSelection, itemLabel } from './ProposalReview.tsx';
+import { RunDiffSheet } from './RunDiffSheet.tsx';
 import { RunHistory, previousRunOf } from './RunHistory.tsx';
+import { describeRunDiff, diffProposals } from './runDiff.ts';
 import { RunPanel, phaseLabel } from './RunPanel.tsx';
 import type { IntegrationSummary, RunRow } from './types.ts';
 
@@ -473,5 +475,63 @@ describe('ApplyToast', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'View run' }));
     expect(onViewRun).toHaveBeenCalled();
+  });
+});
+
+describe('run diff', () => {
+  const withNode = (identityKey: string, title: string, id: string): ImportProposal['items'] => [
+    { ...nodeItem, id, node: { ...nodeItem.node, identityKey, title } },
+  ];
+
+  it('splits the newer run into new, no longer reported and unchanged', () => {
+    const before = { ...proposal(withNode('site:a', 'a', 'i1')), runId: 'run-0' };
+    const after = {
+      ...proposal([...withNode('site:a', 'a', 'i1'), ...withNode('site:b', 'b', 'i2')]),
+      runId: 'run-1',
+    };
+    const diff = diffProposals(before, after);
+    expect(diff.appeared.map((row) => row.label)).toEqual(['b']);
+    expect(diff.missing).toEqual([]);
+    expect(diff.unchanged).toBe(1);
+    expect(describeRunDiff(diff)).toBe('1 new, 1 unchanged since the previous run.');
+  });
+
+  it('reports a result the newer run dropped without calling it removed', async () => {
+    const before = { ...proposal(withNode('site:a', 'a', 'i1')), runId: 'run-0' };
+    const after = { ...proposal([]), runId: 'run-1' };
+    const diff = diffProposals(before, after);
+    expect(diff.missing.map((row) => row.label)).toEqual(['a']);
+
+    const onReview = vi.fn();
+    render(
+      <RunDiffSheet
+        diff={diff}
+        integrationName="Sherlock"
+        onReviewCurrent={onReview}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId('run-diff-caution').textContent).toContain('is not proof');
+    expect(screen.getByTestId('run-diff-missing').textContent).toContain('a');
+    await userEvent.click(screen.getByRole('button', { name: 'Review the newer run' }));
+    expect(onReview).toHaveBeenCalled();
+  });
+
+  it('says so plainly when neither run found anything', () => {
+    const diff = diffProposals(
+      { ...proposal([]), runId: 'run-0' },
+      { ...proposal([]), runId: 'run-1' },
+    );
+    expect(describeRunDiff(diff)).toBe('Both runs found nothing.');
+    render(
+      <RunDiffSheet
+        diff={diff}
+        integrationName="Sherlock"
+        onReviewCurrent={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId('run-diff-appeared')).toBeNull();
+    expect(screen.getByTestId('run-diff-summary').textContent).toBe('Both runs found nothing.');
   });
 });
