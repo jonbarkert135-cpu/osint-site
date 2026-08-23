@@ -20,6 +20,7 @@
     "./sherlock/parser": "./sherlock/parser.ts",
     "./spiderfoot/client": "./spiderfoot/client.ts",
     "./spiderfoot/manifest": "./spiderfoot/manifest.ts",
+    "./spiderfoot/scan-manifest": "./spiderfoot/scanManifest.ts",
     "./spiderfoot/parser": "./spiderfoot/parser.ts",
     "./plugins": "./src/plugins.ts"
   },

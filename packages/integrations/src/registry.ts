@@ -13,6 +13,7 @@ import { manifest as githubManifest } from '../github/manifest.ts';
 import { parser as githubParser } from '../github/parser.ts';
 import { sherlockSources } from '../sherlock/source.ts';
 import { manifest as spiderFootManifest } from '../spiderfoot/manifest.ts';
+import { scanManifest as spiderFootScanManifest } from '../spiderfoot/scanManifest.ts';
 import { parser as spiderFootParser } from '../spiderfoot/parser.ts';
 import {
   defaultNodeMapper,
@@ -61,6 +62,7 @@ export const BUILTIN_SOURCES: readonly IntegrationSource[] = [
   { raw: expandUrlManifest, parser: expandUrlParser },
   { raw: githubManifest, parser: githubParser },
   { raw: spiderFootManifest, parser: spiderFootParser },
+  { raw: spiderFootScanManifest, parser: spiderFootParser },
   ...sherlockSources,
 ];
 

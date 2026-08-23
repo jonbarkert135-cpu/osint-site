@@ -17,12 +17,35 @@ export interface IntegrationPickerProps {
   onSeeAll?: (() => void) | undefined;
 }
 
+/**
+ * The board speaks node types (`website`, `link`, `person`…), manifests speak entity kinds
+ * (`domain`, `url`, `email`…). Without this table every manifest that sources a field from the
+ * selection is unreachable, because no node type is ever spelled like an entity kind.
+ */
+const ENTITY_KINDS_OF_NODE_TYPE: Readonly<Record<string, readonly string[]>> = {
+  website: ['domain', 'url'],
+  link: ['url'],
+  repo: ['repo'],
+  person: ['person', 'username', 'email'],
+  note: ['note'],
+  text: ['note'],
+  file: ['file'],
+  image: ['file'],
+  unknown: ['unknown', 'ip', 'domain'],
+};
+
 export function accepts(
   integration: IntegrationSummary,
   selectionKinds: readonly string[],
 ): boolean {
   if (integration.acceptsKinds.length === 0) return true;
-  return selectionKinds.some((kind) => integration.acceptsKinds.includes(kind));
+  return selectionKinds.some(
+    (kind) =>
+      integration.acceptsKinds.includes(kind) ||
+      (ENTITY_KINDS_OF_NODE_TYPE[kind] ?? []).some((mapped) =>
+        integration.acceptsKinds.includes(mapped),
+      ),
+  );
 }
 
 export function IntegrationPicker({

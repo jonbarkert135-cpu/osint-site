@@ -426,4 +426,16 @@ waypoints, bundling, labels), capture/paste-конвейер, undo/redo, все 
 
 Формы ответов сверены с исходниками SpiderFoot v4.0.0 (`sfwebui.py`), а не выдуманы.
 Тесты: `packages/integrations/test/spiderfoot-client.test.ts`, 14 штук.
-Осталось по пункту 1: кнопка запуска скана в интерфейсе (job воркера + форма выбора цели/профиля).
+
+### Подключение к интерфейсу (2026-08-23, тот же пункт 1)
+
+| требование                 | статус | доказательство                                                                                                                                                                                    |
+| -------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Запуск скана из интерфейса | ✅     | манифест `spiderfoot-scan` (`packages/integrations/spiderfoot/scanManifest.ts`) зарегистрирован одной строкой в `BUILTIN_SOURCES` и появляется в «Run integration» рядом с чтением результатов    |
+| Job воркера                | ✅     | builtin-модуль `spiderfoot-scan` в `apps/runner/src/executors/builtin-registry.ts`: проба → создание → опрос → артефакт, через `safeFetch` (тот же SSRF-guard, N7)                                |
+| Живой счётчик находок      | ✅     | `onProgress` пишет `N findings so far (RUNNING)` в лог прогона, который RunPanel показывает вместе с таймером                                                                                     |
+| «Остановить»               | ✅     | кнопка Cancel панели прогона отменяет job → `ctx.signal` → `runScan` останавливает скан на инстансе и отдаёт частичные находки                                                                    |
+| Выбор из холста            | ✅     | `accepts()` в `IntegrationPicker` сопоставляет тип узла (`website`, `person`…) с сущностями манифеста (`domain`, `username`…) — до этого ни одна интеграция с вводом из выделения не показывалась |
+
+Тесты: `apps/runner/test/builtin.spiderfoot-scan.test.ts` (4), `apps/web/src/integrations/components.test.tsx` (сопоставление типов узлов).
+Ограничение: без `SPIDERFOOT_BASE_URL` прогон честно падает `UPSTREAM_UNAVAILABLE`, а не сканирует несуществующий хост.

@@ -68,6 +68,13 @@ describe('IntegrationPicker', () => {
     expect(accepts({ ...tool, acceptsKinds: [] }, [])).toBe(true);
   });
 
+  it('matches a node type against the entity kinds a manifest asks for', () => {
+    // A website node is a domain to every manifest; without this the tool is unreachable.
+    expect(accepts({ ...tool, acceptsKinds: ['domain'] }, ['website'])).toBe(true);
+    expect(accepts({ ...tool, acceptsKinds: ['username'] }, ['person'])).toBe(true);
+    expect(accepts({ ...tool, acceptsKinds: ['repo'] }, ['note'])).toBe(false);
+  });
+
   it('offers "see all tools" when the caller supplies the route', async () => {
     const onSeeAll = vi.fn();
     render(

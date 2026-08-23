@@ -74,7 +74,7 @@ const mapping = (
 });
 
 /** One row per record type of `mapping.ts`; the table there decides which row a record lands in. */
-const entityMappings: readonly EntityMapping[] = [
+export const entityMappings: readonly EntityMapping[] = [
   mapping('domain', 'domain', 'website', 'observed domain', 0.85),
   mapping('url', 'url', 'link', 'observed url', 0.7),
   mapping('email', 'email', 'person', 'observed email', 0.7),
