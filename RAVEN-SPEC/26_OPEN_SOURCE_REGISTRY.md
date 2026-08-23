@@ -94,7 +94,7 @@ Rule (Part 2 §8): an engine is **adopted** only when it is one line in `BUILTIN
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | Purpose / Category     | username search across social sites → claimed profile URLs (discovery)                                                |
 | License / Version      | MIT; manifest pins tool **v0.16.0** by image digest **[code, 2026-08-23]**                                            |
-| Maintenance status     | tier A, upstream **v0.16.1** (commit 2026-05-02) **[source, 2026-08-19]**                                             |
+| Maintenance status     | tier A, upstream latest release **v0.16.0** (GitHub releases + PyPI) **[upstream, 2026-08-23]**                       |
 | Runtime / Execution    | Python CLI as a container in the runner sandbox: read-only rootfs, gVisor, no capabilities **[code, 2026-08-23]**     |
 | Network                | egress `broad` by necessity (hundreds of sites); private ranges denied **[code, 2026-08-23]**                         |
 | Install rule           | no `SHERLOCK_IMAGE_DIGEST` ⇒ integration absent from the registry — never a floating `:latest` **[code, 2026-08-23]** |
@@ -102,10 +102,10 @@ Rule (Part 2 §8): an engine is **adopted** only when it is one line in `BUILTIN
 | Fallback / Alternative | Maigret (MIT, tier A, 3000+ sites) [22_ECOSYSTEM_AUDIT.md, 2026-08-19]                                                |
 | Deprecation risk       | medium — site definitions rot silently; needs the definition-diff watchdog (§3.4)                                     |
 
-> **Registry finding 2026-08-23:** code pins Sherlock `0.16.0` while the audit verified upstream
-> `0.16.1` four days earlier. Exactly the drift this registry exists to catch — bump
-> `SHERLOCK_TOOL_VERSION` and the pinned digest on the next Sherlock touch, after diffing the
-> 0.16.0→0.16.1 changelog.
+> **Registry finding 2026-08-23:** no drift. The suspected `0.16.1` upstream does not exist — the
+> latest Sherlock release is `v0.16.0` (GitHub `releases/latest` and PyPI `sherlock-project`,
+> checked 2026-08-23), which is exactly what `SHERLOCK_TOOL_VERSION` pins. Version rows in this
+> registry must cite a checked source, not an audit summary.
 
 ## 3. Discovery pipeline (Part 2 §7)
 

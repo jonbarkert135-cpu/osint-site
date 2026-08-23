@@ -24,6 +24,7 @@ import {
   type NodeMapper,
   type OutputParser,
   type RelationshipMapper,
+  type IntegrationSource,
 } from './pipeline.ts';
 import {
   safeParseManifest,
@@ -31,6 +32,8 @@ import {
   type IntegrationManifest,
   type ManifestIssue,
 } from './manifest.ts';
+
+export type { IntegrationSource } from './pipeline.ts';
 
 export interface RegistryEntry {
   readonly manifest: IntegrationManifest;
@@ -51,17 +54,6 @@ export interface Registry {
   readonly entries: ReadonlyMap<IntegrationId, RegistryEntry>;
   /** Surfaced in Admin → Integrations; never silently dropped (§4.3). */
   readonly rejected: readonly RegistryRejection[];
-}
-
-/** Raw declarations before validation. Third-party plugins arrive in exactly this shape. */
-export interface IntegrationSource {
-  readonly raw: unknown;
-  readonly parser: OutputParser;
-  readonly inputAdapter?: (manifest: IntegrationManifest) => InputAdapter;
-  readonly extractor?: (manifest: IntegrationManifest) => EntityExtractor;
-  readonly nodeMapper?: (manifest: IntegrationManifest) => NodeMapper;
-  readonly relationshipMapper?: (manifest: IntegrationManifest) => RelationshipMapper;
-  readonly enabledForOrg?: (orgId: string) => Promise<boolean>;
 }
 
 /** The first-party set. P10–P12 add one line each here and nothing else in this package (R2). */

@@ -5,7 +5,7 @@
  */
 
 import type { InspectorField } from '@nexus/domain';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export interface FieldControlProps {
   field: InspectorField;
@@ -39,6 +39,10 @@ export function FieldControl({
 }: FieldControlProps) {
   const initial = field.control === 'multiselect' ? asLines(value) : asText(value);
   const [draft, setDraft] = useState(initial);
+  // Focus is claimed exactly once. Without this latch the ref callback below refocuses on every
+  // render, which fights a modal's focus trap (Radix pulls focus back, we grab it again) and spins
+  // React forever — that was the hang in BoardWorkspace's export test.
+  const focusClaimed = useRef(false);
 
   // A remote edit (or an undo) must win over an untouched draft.
   useEffect(() => {
@@ -122,7 +126,8 @@ export function FieldControl({
         placeholder={field.placeholder ?? ''}
         ref={(element) => {
           // Focus once, on mount, for a node the user just created; `autoFocus` is banned by a11y lint.
-          if (focusOnMount && element !== null && document.activeElement !== element) {
+          if (focusOnMount && element !== null && !focusClaimed.current) {
+            focusClaimed.current = true;
             element.focus();
             element.select();
           }

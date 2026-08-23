@@ -6,7 +6,7 @@
  * the registry.
  */
 
-import type { IntegrationSource } from '../src/registry.ts';
+import type { IntegrationSource } from '../src/pipeline.ts';
 import { manifest } from './manifest.ts';
 import { parser } from './parser.ts';
 

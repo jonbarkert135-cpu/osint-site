@@ -1067,3 +1067,18 @@ export function effectiveLimits(
 
 export type { ExistingNodeMatch };
 export { resolveEntity };
+
+/**
+ * Raw declarations before validation. Third-party plugins arrive in exactly this shape. It lives
+ * here rather than in `registry.ts` so a built-in source (e.g. `sherlock/source.ts`) can type
+ * itself without importing the registry that imports it back (no-circular).
+ */
+export interface IntegrationSource {
+  readonly raw: unknown;
+  readonly parser: OutputParser;
+  readonly inputAdapter?: (manifest: IntegrationManifest) => InputAdapter;
+  readonly extractor?: (manifest: IntegrationManifest) => EntityExtractor;
+  readonly nodeMapper?: (manifest: IntegrationManifest) => NodeMapper;
+  readonly relationshipMapper?: (manifest: IntegrationManifest) => RelationshipMapper;
+  readonly enabledForOrg?: (orgId: string) => Promise<boolean>;
+}
