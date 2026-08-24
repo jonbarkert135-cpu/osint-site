@@ -167,6 +167,68 @@ describe('RepositoryAnalysisPanel', () => {
     open.mockRestore();
   });
 
+  it('offers one analyze control, and disables it while a run is in flight', async () => {
+    const user = userEvent.setup();
+    const onAnalyze = vi.fn();
+    const { rerender } = render(
+      <RepositoryAnalysisPanel
+        repoKey="r"
+        repositoryUrl="https://example.com/r"
+        analysis={null}
+        onAnalyze={onAnalyze}
+        onRetry={noop}
+        onAnalyzeManually={noop}
+      />,
+    );
+
+    const button = screen.getByTestId('analysis-run');
+    expect(button).toHaveTextContent('Analyze Repository');
+    await user.click(button);
+    expect(onAnalyze).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <RepositoryAnalysisPanel
+        repoKey="r"
+        repositoryUrl="https://example.com/r"
+        analysis={null}
+        analyzing
+        onAnalyze={onAnalyze}
+        onRetry={noop}
+        onAnalyzeManually={noop}
+      />,
+    );
+    expect(screen.getByTestId('analysis-run')).toBeDisabled();
+    expect(screen.getByTestId('analysis-running')).toHaveTextContent('Analyzing this repository');
+    // The empty-state paragraph would contradict the running notice, so it steps aside.
+    expect(screen.queryByTestId('analysis-empty')).toBeNull();
+  });
+
+  it('offers a re-analysis once an analysis exists, and hides the control from a viewer', () => {
+    const { rerender } = render(
+      <RepositoryAnalysisPanel
+        repoKey="r"
+        repositoryUrl="https://example.com/r"
+        analysis={analysis()}
+        onAnalyze={noop}
+        onRetry={noop}
+        onAnalyzeManually={noop}
+      />,
+    );
+    expect(screen.getByTestId('analysis-run')).toHaveTextContent('Re-analyze');
+
+    rerender(
+      <RepositoryAnalysisPanel
+        repoKey="r"
+        repositoryUrl="https://example.com/r"
+        analysis={analysis()}
+        onAnalyze={null}
+        onRetry={noop}
+        onAnalyzeManually={noop}
+      />,
+    );
+    expect(screen.queryByTestId('analysis-run')).toBeNull();
+  });
+
   it('explains the empty state instead of rendering an empty panel', () => {
     render(
       <RepositoryAnalysisPanel

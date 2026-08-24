@@ -291,6 +291,13 @@ export function start(): Promise<() => Promise<void>> {
     enqueueHydrate: async (payload) => {
       await githubQueue.add('github.hydrate', payload, githubJobOptions('github.hydrate', payload));
     },
+    enqueueProposal: async (payload) => {
+      await githubQueue.add(
+        'github.proposal',
+        payload,
+        githubJobOptions('github.proposal', payload),
+      );
+    },
     newId: () => newId.proposal(),
     now: () => Date.now(),
   });

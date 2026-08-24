@@ -40,6 +40,7 @@ export type AuditAction =
   | 'integration.proposal.discarded'
   | 'integration.watch.created'
   | 'integration.watch.removed'
+  | 'repository.analysis.requested'
   | 'apiToken.created'
   | 'apiToken.revoked';
 

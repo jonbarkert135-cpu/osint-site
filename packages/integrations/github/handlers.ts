@@ -72,6 +72,8 @@ export interface GithubHandlerDeps {
   /** One client per job: the request cap in §5.9 is per analysis, not per process. */
   createClient(signal: AbortSignal): GithubClient;
   enqueueHydrate(payload: GithubHydratePayload): Promise<void>;
+  /** Chains §6: a fresh analysis is immediately turned into a draft integration proposal. */
+  enqueueProposal(payload: GithubProposalPayload): Promise<void>;
   newId(): string;
   now(): number;
 }
@@ -148,7 +150,9 @@ async function analyze(
   const inputs = await collectAnalysisInputs(deps.createClient(signal), payload.repoKey, {
     nowMs: deps.now(),
   });
-  await deps.store.saveAnalysis(analyzeRepository(inputs));
+  const analysisId = await deps.store.saveAnalysis(analyzeRepository(inputs));
+  // §6.1: the proposal is a separate job so a slow build cannot lose the analysis that produced it.
+  await deps.enqueueProposal({ analysisId });
 }
 
 async function proposal(deps: GithubHandlerDeps, payload: GithubProposalPayload): Promise<void> {
