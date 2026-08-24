@@ -42,6 +42,7 @@ import type {
 import type { QueryPlan } from './plan.ts';
 import { canonicalValue } from './normalize.ts';
 import { createGraphBuilder, type Provenance, type ResolvedEntity } from './resolve.ts';
+import { buildDag, createScheduler } from './schedule.ts';
 
 export interface EngineLibrary {
   get(id: EngineId): TransformEngine | undefined;
@@ -472,65 +473,136 @@ export async function* executePlan(
     }
   };
 
-  for (const stage of stages) {
-    if (cancelled || budgetExhausted) break;
-    const stageSteps = query.plan.steps.filter((step) => step.depth === stage);
-    yield { type: 'stage.started', stage, steps: stageSteps.length };
+  const dag = buildDag(query.plan.steps);
+  warnings.push(...dag.warnings);
+  yield {
+    type: 'plan.graph',
+    nodes: [...dag.nodes.values()].map((node) => ({
+      transform: node.step.transform,
+      dependsOn: node.dependsOn,
+      rank: node.rank,
+    })),
+    depth: dag.depth,
+    width: dag.width,
+    warnings: dag.warnings,
+  };
 
-    const channel = createChannel<QueryEvent>();
-    const emit = (event: QueryEvent): void => channel.push(event);
+  const scheduler = createScheduler(dag);
+  const channel = createChannel<QueryEvent>();
+  const emit = (event: QueryEvent): void => channel.push(event);
+  const announcedRanks = new Set<number>();
+  let settledNodes = 0;
 
-    const tasks: (() => Promise<void>)[] = [];
-    for (const step of stageSteps) {
-      const transform = deps.registry.transform(step.transform);
-      if (!transform) continue;
-      const inputs = inputsFor(step, transform);
-      if (inputs.length === 0) {
-        skipped += 1;
-        emit({
-          type: 'step.skipped',
-          step: { transform: step.transform, stage, input: { kind: step.inputKind, value: '' } },
-          reason: 'already-covered',
-        });
-        continue;
-      }
-      const used = consumed.get(step.transform) ?? new Set<string>();
-      for (const input of inputs) {
-        used.add(input.entityId);
-        tasks.push(async () => {
-          if (builder.entities.length >= budget.maxNewNodes) {
-            budgetExhausted = true;
-            return;
-          }
-          if (now() - startedAt > budget.maxRuntimeMs) {
-            budgetExhausted = true;
-            return;
-          }
-          await runOneStep(step, transform, input, emit);
-        });
-      }
-      consumed.set(step.transform, used);
+  const emitRunProgress = (): void => {
+    const planned = dag.nodes.size;
+    emit({
+      type: 'run.progress',
+      fraction: planned === 0 ? 1 : Math.min(1, settledNodes / planned),
+      settled: settledNodes,
+      planned,
+      inFlight: scheduler.inFlight(),
+      entities: builder.entities.length,
+    });
+  };
+
+  const overBudget = (): boolean => {
+    if (builder.entities.length >= budget.maxNewNodes || now() - startedAt > budget.maxRuntimeMs) {
+      budgetExhausted = true;
+      return true;
+    }
+    return false;
+  };
+
+  /** Runs one DAG node: its inputs share the node, so they are executed in order inside it. */
+  const runNode = async (id: string): Promise<void> => {
+    const node = dag.nodes.get(id);
+    if (!node) return;
+    const step = node.step;
+    const ranked = node.rank;
+    if (!announcedRanks.has(ranked)) {
+      announcedRanks.add(ranked);
+      const peers = [...dag.nodes.values()].filter((other) => other.rank === ranked).length;
+      emit({ type: 'stage.started', stage: step.depth, steps: peers });
     }
 
-    // Steps inside a stage are concurrent, under the plan's own parallelism ceiling.
-    let cursor = 0;
-    const workers = Array.from(
-      { length: Math.max(1, Math.min(budget.maxParallel, tasks.length)) },
-      async () => {
-        for (;;) {
-          const index = cursor++;
-          const task = tasks[index];
-          if (!task) return;
-          await task();
-        }
-      },
-    );
-    void Promise.all(workers).then(
-      () => channel.close(),
-      () => channel.close(),
-    );
+    const transform = deps.registry.transform(step.transform);
+    if (!transform) return;
+    const inputs = inputsFor(step, transform);
+    const ref = (value: string): StepRef => ({
+      transform: step.transform,
+      stage: step.depth,
+      input: { kind: step.inputKind, value },
+    });
+    if (inputs.length === 0) {
+      skipped += 1;
+      emit({ type: 'step.skipped', step: ref(''), reason: 'already-covered' });
+      return;
+    }
 
-    for await (const event of channel.drain()) yield event;
+    const used = consumed.get(step.transform) ?? new Set<string>();
+    for (const input of inputs) used.add(input.entityId);
+    consumed.set(step.transform, used);
+
+    emit({ type: 'step.progress', step: ref(inputs[0]?.value ?? ''), fraction: 0, produced: 0 });
+    const before = builder.entities.length;
+    for (const [index, input] of inputs.entries()) {
+      if (cancelled || overBudget()) return;
+      await runOneStep(step, transform, input, emit);
+      emit({
+        type: 'step.progress',
+        step: ref(input.value),
+        fraction: (index + 1) / inputs.length,
+        produced: builder.entities.length - before,
+      });
+    }
+  };
+
+  // Dependency-aware, not stage-gated: a node starts the moment its own predecessors settle, so
+  // independent branches never wait behind a slow neighbour (Part 2 §12–§13).
+  const drive = async (): Promise<void> => {
+    const inFlight = new Set<Promise<void>>();
+    const ceiling = Math.max(1, budget.maxParallel);
+    for (;;) {
+      if (cancelled || deps.signal?.aborted === true) {
+        cancelled = true;
+        break;
+      }
+      if (budgetExhausted) break;
+      const batch = scheduler.take(ceiling - inFlight.size);
+      for (const id of batch) {
+        const task = runNode(id)
+          .catch((cause: unknown) => {
+            failed += 1;
+            warnings.push(`${id}: ${cause instanceof Error ? cause.message : 'step crashed'}`);
+          })
+          .finally(() => {
+            scheduler.settle(id);
+            settledNodes += 1;
+            emitRunProgress();
+            inFlight.delete(task);
+          });
+        inFlight.add(task);
+      }
+      if (inFlight.size === 0) {
+        if (scheduler.finished() || scheduler.pending() === 0) break;
+        continue;
+      }
+      await Promise.race(inFlight);
+    }
+    await Promise.allSettled([...inFlight]);
+  };
+
+  void drive().then(
+    () => channel.close(),
+    () => channel.close(),
+  );
+
+  for await (const event of channel.drain()) yield event;
+
+  const stranded = scheduler.blocked();
+  if (stranded.length > 0 && !cancelled && !budgetExhausted) {
+    skipped += stranded.length;
+    warnings.push(`never reached: ${stranded.join(', ')}`);
   }
 
   if (budgetExhausted)

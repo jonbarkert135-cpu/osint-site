@@ -187,6 +187,51 @@ describe('executePlan', () => {
     expect(secondStageInputs.every((value) => value !== 'example.com')).toBe(true);
   });
 
+  it('emits the scheduled DAG before it runs anything', async () => {
+    const { events } = await collect(planQuery(registry, 'example.com', ctx(), { depth: 2 }));
+    const graph = events.find((event) => event.type === 'plan.graph');
+    expect(graph).toBeDefined();
+    if (graph?.type !== 'plan.graph') throw new Error('expected plan.graph');
+    expect(graph.nodes.length).toBeGreaterThan(0);
+    expect(graph.depth).toBeGreaterThan(0);
+    expect(graph.width).toBeGreaterThan(0);
+    expect(events.findIndex((event) => event.type === 'plan.graph')).toBeLessThan(
+      events.findIndex((event) => event.type === 'step.started'),
+    );
+  });
+
+  it('streams per-step and whole-run progress', async () => {
+    const { events } = await collect(planQuery(registry, 'example.com', ctx()));
+    const stepProgress = events.filter((event) => event.type === 'step.progress');
+    const runProgress = events.filter((event) => event.type === 'run.progress');
+    expect(stepProgress.length).toBeGreaterThan(0);
+    expect(runProgress.length).toBeGreaterThan(0);
+    for (const event of [...stepProgress, ...runProgress]) {
+      if (event.type === 'step.progress' || event.type === 'run.progress') {
+        expect(event.fraction).toBeGreaterThanOrEqual(0);
+        expect(event.fraction).toBeLessThanOrEqual(1);
+      }
+    }
+    const last = runProgress.at(-1);
+    if (last?.type !== 'run.progress') throw new Error('expected run.progress');
+    expect(last.settled).toBe(last.planned);
+    expect(last.fraction).toBe(1);
+  });
+
+  it('starts independent steps together instead of serialising them', async () => {
+    let open = 0;
+    let peak = 0;
+    const slowFetch: HostFetch = async (url) => {
+      open += 1;
+      peak = Math.max(peak, open);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      open -= 1;
+      return NET[url] ?? { status: 503, body: null };
+    };
+    await runPlan(planQuery(registry, 'example.com', ctx()), deps({ fetch: slowFetch }));
+    expect(peak).toBeGreaterThan(1);
+  });
+
   it('says why it did nothing when the input types to nothing routable', async () => {
     const result = await runPlan(planQuery(registry, '   ', ctx()), deps());
     expect(result.summary.status).toBe('failed');

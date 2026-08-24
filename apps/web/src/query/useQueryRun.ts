@@ -31,13 +31,20 @@ export type RunPhase = 'idle' | 'running' | 'done' | 'failed';
 
 export interface StepProgress {
   readonly transform: string;
-  readonly state: 'running' | 'done' | 'failed' | 'skipped';
+  readonly state: 'queued' | 'running' | 'done' | 'failed' | 'skipped';
   readonly detail: string;
+  /** 0..1 — drives the per-service progress bar (Part 2 §14). */
+  readonly fraction: number;
+  readonly produced: number;
 }
 
 export interface QueryRunState {
   readonly phase: RunPhase;
   readonly steps: readonly StepProgress[];
+  /** Whole-run completion, 0..1. */
+  readonly progress: number;
+  /** How many steps are executing right now — the visible proof of parallel execution. */
+  readonly inFlight: number;
   readonly found: number;
   readonly result: InvestigationResult | null;
   readonly error: string | null;
@@ -46,6 +53,8 @@ export interface QueryRunState {
 const EMPTY: QueryRunState = {
   phase: 'idle',
   steps: [],
+  progress: 0,
+  inFlight: 0,
   found: 0,
   result: null,
   error: null,
@@ -54,10 +63,19 @@ const EMPTY: QueryRunState = {
 const upsert = (
   steps: readonly StepProgress[],
   transform: string,
-  next: Omit<StepProgress, 'transform'>,
+  next: Partial<Omit<StepProgress, 'transform'>>,
 ): StepProgress[] => {
   const index = steps.findIndex((step) => step.transform === transform);
-  const row: StepProgress = { transform, ...next };
+  const base: StepProgress = steps[index] ?? {
+    transform,
+    state: 'queued',
+    detail: '',
+    fraction: 0,
+    produced: 0,
+  };
+  // A bar never walks backwards: a late event with a smaller fraction is noise, not progress.
+  const fraction = Math.max(base.fraction, next.fraction ?? base.fraction);
+  const row: StepProgress = { ...base, ...next, transform, fraction };
   if (index < 0) return [...steps, row];
   return steps.map((step, i) => (i === index ? row : step));
 };
@@ -67,6 +85,19 @@ export function reduceEvent(state: QueryRunState, event: QueryEvent): QueryRunSt
   switch (event.type) {
     case 'plan.started':
       return { ...EMPTY, phase: 'running' };
+    case 'plan.graph':
+      return {
+        ...state,
+        steps: event.nodes.reduce<readonly StepProgress[]>(
+          (steps, node) =>
+            upsert(steps, node.transform, {
+              state: 'queued',
+              detail:
+                node.dependsOn.length === 0 ? 'ready' : `waits for ${node.dependsOn.join(', ')}`,
+            }),
+          state.steps,
+        ),
+      };
     case 'step.started':
       return {
         ...state,
@@ -75,12 +106,24 @@ export function reduceEvent(state: QueryRunState, event: QueryEvent): QueryRunSt
           detail: `via ${event.engine}`,
         }),
       };
+    case 'step.progress':
+      return {
+        ...state,
+        steps: upsert(state.steps, event.step.transform, {
+          state: 'running',
+          fraction: event.fraction,
+          produced: event.produced,
+        }),
+      };
+    case 'run.progress':
+      return { ...state, progress: event.fraction, inFlight: event.inFlight };
     case 'step.skipped':
       return {
         ...state,
         steps: upsert(state.steps, event.step.transform, {
           state: 'skipped',
           detail: event.reason,
+          fraction: 1,
         }),
       };
     case 'entity.found':
@@ -91,6 +134,8 @@ export function reduceEvent(state: QueryRunState, event: QueryEvent): QueryRunSt
         steps: upsert(state.steps, event.step.transform, {
           state: 'done',
           detail: `${String(event.produced)} result(s)${event.cached ? ' · cached' : ''}`,
+          fraction: 1,
+          produced: event.produced,
         }),
       };
     case 'step.failed':
@@ -99,6 +144,7 @@ export function reduceEvent(state: QueryRunState, event: QueryEvent): QueryRunSt
         steps: upsert(state.steps, event.step.transform, {
           state: event.fallback ? 'running' : 'failed',
           detail: event.fallback ? `retrying after: ${event.message}` : event.message,
+          ...(event.fallback ? {} : { fraction: 1 }),
         }),
       };
     default:
@@ -159,7 +205,13 @@ export function useQueryRun(options: UseQueryRunOptions = {}): QueryRunControlle
           const step = await stream.next();
           if (step.done === true) {
             const result = step.value;
-            setState((current) => ({ ...current, phase: 'done', result }));
+            setState((current) => ({
+              ...current,
+              phase: 'done',
+              progress: 1,
+              inFlight: 0,
+              result,
+            }));
             return;
           }
           const event = step.value;

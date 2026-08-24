@@ -62,3 +62,18 @@ items — each needs a roadmap entry, not another spec.
 
 The owner supplies Part 2 sections in batches. When the next batch arrives, extend the table in §1
 with the same three columns and update §2 rather than starting a new coverage document.
+
+## 5. Batch §11–§14 — orchestration (2026-08-24)
+
+| §   | Requirement                        | Where it now lives                                              | State   |
+| --- | ---------------------------------- | --------------------------------------------------------------- | ------- |
+| 11  | Universal Service Orchestrator     | `29_ORCHESTRATION.md` §11, `packages/query-engine/executor.ts`  | ✅ code |
+| 12  | Parallel execution of independents | `schedule.ts` ready-queue + `budget.maxParallel`                | ✅ code |
+| 13  | Dependency-aware DAG execution     | `buildDag` / `createScheduler`, `plan.graph` event              | ✅ code |
+| 14  | Single streaming result channel    | `step.progress` / `run.progress` events, `useQueryRun` snapshot | ✅ code |
+
+Correction to §2 above: the plan executor **does** exist (`executePlan`, shipped 2026-08-24); the
+gap that remains is engine coverage and the server-side egress proxy, not execution itself.
+
+Open after this batch: heartbeat progress from inside a single long engine (needs a runner protocol
+change), cross-run queueing in `apps/worker`, circuit breaker and retries (`24` §6.1).
