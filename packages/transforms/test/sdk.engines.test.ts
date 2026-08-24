@@ -158,6 +158,76 @@ describe('rdap-lookup', () => {
   });
 });
 
+describe('rdap-lookup on networks', () => {
+  const IP_URL = 'https://rdap.org/ip/8.8.8.8';
+  const AS_URL = 'https://rdap.org/autnum/15169';
+  const NET = {
+    [IP_URL]: {
+      status: 200,
+      body: {
+        handle: 'NET-8-8-8-0-1',
+        name: 'GOGL',
+        startAddress: '8.8.8.0',
+        endAddress: '8.8.8.255',
+        entities: [
+          {
+            roles: ['registrant'],
+            vcardArray: [
+              'vcard',
+              [
+                ['fn', {}, 'text', 'Google LLC'],
+                ['adr', {}, 'text', ['', '', '1600 Amphitheatre Parkway', 'Mountain View']],
+              ],
+            ],
+          },
+        ],
+      },
+    },
+    [AS_URL]: { status: 200, body: { handle: 'AS15169', name: 'GOOGLE' } },
+  } as const;
+
+  it('reads an IP allocation into an asn entity with its address range', async () => {
+    const outcome = await createTestHost({ net: NET }).run(createRdapLookup(), {
+      kind: 'ip',
+      value: '8.8.8.8',
+    });
+
+    const allocation = outcome.entities.find((entity) => entity.kind === 'asn');
+    expect(allocation?.value).toBe('NET-8-8-8-0-1');
+    expect(allocation?.props).toMatchObject({ startAddress: '8.8.8.0', endAddress: '8.8.8.255' });
+    // A person with a name that is really an organisation is still reported as what it is.
+    expect(
+      outcome.entities.some((entity) => entity.kind === 'person' && entity.value === 'Google LLC'),
+    ).toBe(true);
+  });
+
+  it('accepts an AS number with or without the AS prefix', async () => {
+    const engine = createRdapLookup();
+    expect(engine.validateInput({ kind: 'asn', value: 'AS15169' })).toEqual({
+      ok: true,
+      normalizedValue: '15169',
+    });
+    expect(engine.validateInput({ kind: 'asn', value: 'nope' }).ok).toBe(false);
+    expect(engine.validateInput({ kind: 'ip', value: '999.1.1.1' }).ok).toBe(false);
+
+    const outcome = await createTestHost({ net: NET }).run(engine, {
+      kind: 'asn',
+      value: 'AS15169',
+    });
+    expect(outcome.entities.map((entity) => entity.value)).toEqual(['AS15169']);
+  });
+
+  it('treats a registry error as an incomplete answer so the chain may try another engine', async () => {
+    const outcome = await createTestHost({
+      net: { 'https://rdap.org/domain/example.com': { status: 500, body: null } },
+    }).run(createRdapLookup(), { kind: 'domain', value: 'example.com' });
+
+    expect(outcome.status).toBe('completed');
+    expect(outcome.entities).toEqual([]);
+    expect(outcome.exhaustive).toBe(false);
+  });
+});
+
 describe('BUILTIN_ENGINES', () => {
   it('only lists engines the catalogue knows, and agrees with their manifests', () => {
     for (const [id, factory] of Object.entries(BUILTIN_ENGINES)) {

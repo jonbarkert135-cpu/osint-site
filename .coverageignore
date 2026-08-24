@@ -30,6 +30,9 @@ packages/layout/src/index.ts
 packages/transforms/src/index.ts
 packages/transforms/src/catalog/index.ts
 packages/transforms/src/sdk/index.ts
+# Engine directory: re-exports plus one id→factory map, exercised by test/sdk.engines.test.ts;
+# vitest's global `**/index.ts` coverage exclude means v8 emits no entry for it.
+packages/transforms/src/sdk/engines/index.ts
 packages/integrations/src/index.ts
 packages/ai/src/index.ts
 packages/ui/src/index.ts
