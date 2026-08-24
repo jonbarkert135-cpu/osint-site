@@ -5,10 +5,18 @@
  */
 
 import { addNode, createBoardDoc, makeNode } from '@nexus/domain';
-import { describe, expect, it, vi } from 'vitest';
+import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
+import { IndexeddbPersistence } from 'y-indexeddb';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as Y from 'yjs';
 
-import { buildWorkspaceIndex, indexDocsForBoard, splitResultId } from './workspaceSearch';
+import { boardStoreName } from '../data/persistence.ts';
+import {
+  buildWorkspaceIndex,
+  indexDocsForBoard,
+  loadBoardDocFromIndexedDb,
+  splitResultId,
+} from './workspaceSearch';
 
 const NOW = '2026-08-24T12:00:00.000Z';
 const ORIGIN = { origin: 'local:create' as const, now: NOW };
@@ -78,5 +86,52 @@ describe('buildWorkspaceIndex', () => {
     });
     expect(failed).toEqual([]);
     expect(index.size).toBe(0);
+  });
+});
+
+describe('loadBoardDocFromIndexedDb', () => {
+  beforeEach(() => {
+    globalThis.indexedDB = new IDBFactory();
+    globalThis.IDBKeyRange = IDBKeyRange;
+  });
+
+  it('reads a board persisted in IndexedDB and detaches the provider', async () => {
+    const doc = boardWith('b_idb', ['Persisted node']);
+    const provider = new IndexeddbPersistence(boardStoreName('b_idb'), doc);
+    await provider.whenSynced;
+    await provider.destroy();
+
+    const loaded = await loadBoardDocFromIndexedDb('b_idb');
+    expect(loaded).not.toBeNull();
+    expect(indexDocsForBoard(loaded as Y.Doc, 'b_idb').map((d) => d.title)).toEqual([
+      'Persisted node',
+    ]);
+  });
+
+  it('returns an empty document for a board that was never opened locally', async () => {
+    const loaded = await loadBoardDocFromIndexedDb('b_missing');
+    expect(indexDocsForBoard(loaded as Y.Doc, 'b_missing')).toEqual([]);
+  });
+
+  it('returns null when the environment has no IndexedDB', async () => {
+    const original = globalThis.indexedDB;
+    // @ts-expect-error — deliberately simulating a non-browser environment.
+    delete globalThis.indexedDB;
+    try {
+      expect(await loadBoardDocFromIndexedDb('b_any')).toBeNull();
+    } finally {
+      globalThis.indexedDB = original;
+    }
+  });
+
+  it('indexes a real workspace end to end through IndexedDB', async () => {
+    const doc = boardWith('b_e2e', ['Canvas note']);
+    const provider = new IndexeddbPersistence(boardStoreName('b_e2e'), doc);
+    await provider.whenSynced;
+    await provider.destroy();
+
+    const { index, failed } = await buildWorkspaceIndex([{ id: 'b_e2e', title: 'E2E' }]);
+    expect(failed).toEqual([]);
+    expect(index.search('Canvas').map((hit) => hit.id)).toEqual(['b_e2e:b_e2e-n0']);
   });
 });
