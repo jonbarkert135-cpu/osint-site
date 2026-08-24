@@ -86,7 +86,16 @@ Rule (Part 2 §8): an engine is **adopted** only when it is one line in `BUILTIN
 | Network                | exactly one host, from `SPIDERFOOT_BASE_URL` (no default; unconfigured = dead host) **[code, 2026-08-23]**                                                                                                |
 | Known gap              | Raven cannot launch/poll/cancel scans yet — analyst starts the scan, pastes the id (roadmap §1)                                                                                                           |
 | Fallback / Alternative | tier-A passive chain from the audit: subfinder + httpx + Amass for infrastructure, Sherlock + Maigret for usernames [22_ECOSYSTEM_AUDIT.md, 2026-08-19]                                                   |
-| Deprecation risk       | **high** — single-maintainer upstream with stalled activity; the fallback chain is the mitigation                                                                                                         |
+| Deprecation risk       | **critical — demoted to Tier D on 2026-08-24**: last upstream release **v4.0, 2022-04-07** (>3 years), project acquired by Intel 471, open issue "Project Dead?" unanswered **[source, 2026-08-24]**      |
+
+> **Status change 2026-08-24.** SpiderFoot is no longer an engine Raven may depend on for a
+> capability. It stays registered as an _optional, user-operated_ instance (an analyst who already
+> runs SpiderFoot can still pull results in), but the broad-sweep capability is re-composed from
+> maintained parts: subfinder + dnsx + httpx (infrastructure), theHarvester (e-mail/domain,
+> subprocess only — GPL), Sherlock + Maigret (usernames), and the free public APIs (RDAP, DoH,
+> crt.sh, GLEIF). No roadmap item may assume SpiderFoot is present. See
+> `22_ECOSYSTEM_AUDIT.md` §10.5. Community revival forks exist (`poppopjmp/spiderfoot`,
+> `Jaheay/spiderfoot`) — **unverified**, not adoptable without their own passports.
 
 ### 2.4 sherlock — username → profile discovery (sandboxed container)
 
@@ -141,10 +150,21 @@ Next adoption order follows the roadmap, not this document.
 
 Record rejections here so they are not re-litigated (Part 2 §6, §58):
 
-| Project                  | Verdict                  | Why                                                | Date       |
-| ------------------------ | ------------------------ | -------------------------------------------------- | ---------- |
-| OpenCorporates free tier | forbidden for enrichment | share-alike terms unusable in a commercial product | 2026-08-19 |
-| HIBP (full API)          | BYOK-only                | paid for everything except Pwned Passwords         | 2026-08-19 |
+| Project                                 | Verdict                  | Why                                                                          | Date       |
+| --------------------------------------- | ------------------------ | ---------------------------------------------------------------------------- | ---------- |
+| OpenCorporates free tier                | forbidden for enrichment | share-alike terms unusable in a commercial product                           | 2026-08-19 |
+| HIBP (full API)                         | BYOK-only                | paid for everything except Pwned Passwords                                   | 2026-08-19 |
+| SpiderFoot (as a core engine)           | demoted to Tier D        | unmaintained upstream since 2022-04-07; acquired, no releases                | 2026-08-24 |
+| PhoneInfoga                             | forbidden                | author declares it unmaintained, may be archived; GPL-3.0                    | 2026-08-24 |
+| PyMuPDF                                 | forbidden (bundled)      | AGPL-3.0 — use pdf.js / pdfplumber / docling instead                         | 2026-08-24 |
+| marker / surya weights                  | conditional              | code Apache-2.0 but weights are modified OpenRAIL-M with a revenue threshold | 2026-08-24 |
+| libraries.io                            | rejected                 | AGPL and the open dataset is abandoned — call registry APIs directly         | 2026-08-24 |
+| Kuzu                                    | rejected                 | archived by its own maintainers                                              | 2026-08-24 |
+| RedisGraph                              | rejected                 | discontinued upstream                                                        | 2026-08-24 |
+| Bing Web Search API                     | rejected                 | retired by Microsoft                                                         | 2026-08-24 |
+| `@xenova/transformers`                  | rejected                 | dead since 2024-05 — successor is `@huggingface/transformers`                | 2026-08-24 |
+| n8n / Windmill EE / Memgraph / ArangoDB | external service only    | Sustainable Use / AGPL+EE / BUSL 1.1 — never vendored                        | 2026-08-24 |
+| Blackbird                               | on hold                  | licence not stated in the repo; unusable until LICENSE is read               | 2026-08-24 |
 
 ### 3.3 Freshness cadence
 
@@ -169,3 +189,49 @@ Until the survey exists (`27_HIDDEN_CLOUD_ARCHITECTURE.md`, next document in the
 every passport's Hidden Cloud field stays **unverified**, and the working assumption for new
 engines is the most restrictive one: prefer `http` and `builtin` execution kinds; treat
 containerized engines (Sherlock today) as requiring a confirmed container runtime.
+
+---
+
+## 5. The discovery engine as a running system (Part 2 §7)
+
+The pipeline in §3 is the decision procedure. This section is what actually runs it, so the registry
+stays true without anyone remembering to check.
+
+### 5.1 Watchers
+
+Scheduled jobs in `apps/worker`, each writing a dated record, never mutating a passport by itself —
+a watcher raises a **drift finding**, a human merges the passport change.
+
+| Watcher            | Cadence | Source of truth                                        | Fires when                                                          |
+| ------------------ | ------- | ------------------------------------------------------ | ------------------------------------------------------------------- |
+| `release-watch`    | daily   | GitHub releases API, PyPI, npm, crates.io              | adopted engine has a newer version than the pin                     |
+| `liveness-watch`   | weekly  | repo `pushed_at`, `archived` flag, open-issue activity | no push in 12 months, or `archived: true` → propose tier demotion   |
+| `license-watch`    | weekly  | the `LICENSE` file blob hash + SPDX id                 | licence text changes at all → block adoption, require re-review     |
+| `definition-watch` | daily   | site-definition files (Sherlock, Maigret, WhatsMyName) | definition diff exceeds a threshold → re-run contract tests (§3.4)  |
+| `vuln-watch`       | daily   | OSV / GitHub advisories for pinned images and packages | any advisory affecting a pinned engine                              |
+| `endpoint-watch`   | weekly  | vendor status/pricing/ToS pages for BYOK services      | retirement notice, price change, ToS change (cf. Bing's retirement) |
+
+Rules: watchers are **read-only** and rate-limit-aware (use a token; GitHub anonymous is 60 req/h and
+was the binding constraint in the 2026-08-24 pass). A watcher that cannot verify records
+`unverified` — it never guesses, and an unverified result is never written as a fact.
+
+### 5.2 Candidate intake
+
+New candidates arrive from three places only: the audit's category sweeps, release feeds of already
+adopted ecosystems, and explicit user requests. Each one enters as a passport stub with every field
+`unverified`, then walks §3's gates in order. A stub older than 90 days with no progress is closed as
+"not pursued" and logged in §3.2 so it is not re-litigated.
+
+### 5.3 Scoring
+
+Integration Score = weighted sum, weights fixed in `22_ECOSYSTEM_AUDIT.md` §10.4. The score is
+advisory: **licence and execution safety are veto gates, not weights**. An engine scoring 95 with an
+AGPL library that must be linked into our build is still rejected.
+
+### 5.4 What the registry refuses to do
+
+- It does not vendor third-party engine code into this repository.
+- It does not pin floating tags (`:latest`) — digests only.
+- It does not record a version, date or licence that was not read from a primary source on a stated
+  date.
+- It does not let an engine become a hard dependency without a named fallback in its passport.
