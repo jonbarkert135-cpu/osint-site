@@ -44,20 +44,27 @@
   pointer-events: none;
 }
 
+/* Primary is the one gradient surface in the product (04 §3.6): the brand ramp plus a soft
+   accent glow, so the single most important action in a region is unmistakable. */
 .nx-btn[data-variant='primary'] {
-  background: var(--btn-primary-bg);
+  background-color: var(--btn-primary-bg);
+  background-image: var(--brand-gradient);
   color: var(--btn-primary-fg);
-  border-color: var(--btn-primary-border);
+  border-color: transparent;
+  box-shadow: var(--glow-accent);
 }
 .nx-btn[data-variant='primary']:hover:not(:disabled) {
-  background: var(--btn-primary-bg-hover);
+  background-color: var(--btn-primary-bg-hover);
+  filter: brightness(1.08);
 }
 .nx-btn[data-variant='primary']:active:not(:disabled) {
-  background: var(--btn-primary-bg-active);
+  background-color: var(--btn-primary-bg-active);
+  filter: brightness(0.94);
 }
 
 .nx-btn[data-variant='secondary'] {
   background: var(--btn-secondary-bg);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
   color: var(--btn-secondary-fg);
   border-color: var(--btn-secondary-border);
 }

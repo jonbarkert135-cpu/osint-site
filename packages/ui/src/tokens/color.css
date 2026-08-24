@@ -16,15 +16,15 @@
   --nx-neutral-950: #e6e9ee;
   --nx-neutral-1000: #f7f8fa;
 
-  /* Accent — "Signal Blue", one family only. */
-  --nx-accent-200: #bfd0f0;
-  --nx-accent-300: #93aee6;
-  --nx-accent-400: #6e8fd6;
-  --nx-accent-500: #5b7cc4;
-  --nx-accent-600: #4a66a8;
-  --nx-accent-700: #38507f;
-  --nx-accent-800: #27374f;
-  --nx-accent-900: #1a2437;
+  /* Accent — "Raven Azure", one family only. Taken from the raven mark (04 §3.2). */
+  --nx-accent-200: #cfe7fb;
+  --nx-accent-300: #8fcbf5;
+  --nx-accent-400: #4faee9;
+  --nx-accent-500: #2f95d6;
+  --nx-accent-600: #2176ae;
+  --nx-accent-700: #1a5a85;
+  --nx-accent-800: #143f5c;
+  --nx-accent-900: #102e42;
 
   /* Semantic hues */
   --nx-info-400: #6ea8d8;
@@ -107,6 +107,31 @@
   --entity-repo-fg: var(--nx-entity-repo);
   --entity-toolrun-fg: var(--nx-entity-toolrun);
   --entity-group-fg: var(--nx-entity-group);
+
+  /* Brand chrome — the "premium dark" layer (04 §3.6). Glass surfaces read as one material:
+     a translucent tint + a hairline highlight + a backdrop blur, never a flat grey. */
+  --brand-gradient: linear-gradient(
+    135deg,
+    var(--nx-accent-300) 0%,
+    var(--nx-accent-500) 52%,
+    var(--nx-accent-700) 100%
+  );
+  --brand-text-gradient: linear-gradient(
+    100deg,
+    var(--nx-neutral-1000) 12%,
+    var(--nx-accent-300) 88%
+  );
+  --glass-bg: color-mix(in oklab, var(--nx-neutral-100) 72%, transparent);
+  --glass-bg-strong: color-mix(in oklab, var(--nx-neutral-150) 86%, transparent);
+  --glass-blur: 18px;
+  --glass-highlight: color-mix(in oklab, var(--nx-neutral-1000) 10%, transparent);
+  --glow-accent: 0 0 0 1px color-mix(in oklab, var(--nx-accent-400) 30%, transparent),
+    0 8px 28px -14px color-mix(in oklab, var(--nx-accent-400) 60%, transparent);
+  --ambient-glow: radial-gradient(
+    120% 82% at 50% -18%,
+    color-mix(in oklab, var(--nx-accent-500) 16%, transparent) 0%,
+    transparent 62%
+  );
 
   --overlay-scrim: rgb(0 0 0 / 0.56);
   --overlay-backdrop-blur: 6px;

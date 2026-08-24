@@ -1,4 +1,8 @@
-# Raven OSINT — Advanced Research & Intelligence Canvas
+<p align="center">
+  <img src="docs/brand/raven-mark.png" alt="Raven OSINT" width="160" />
+</p>
+
+<h1 align="center">Raven OSINT — Advanced Research &amp; Intelligence Canvas</h1>
 
 > An infinite canvas over a typed knowledge graph, for authorized OSINT and research work.
 > Collect anything, link everything, enrich it with open-source tooling, export a defensible report.

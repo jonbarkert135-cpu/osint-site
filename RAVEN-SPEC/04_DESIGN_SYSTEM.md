@@ -74,6 +74,22 @@ The canvas is the subject. UI chrome sits within a narrow luminance band (`--sur
   only saturated pixel in that region.
 - **Don't:** give the toolbar an accent-tinted gradient background.
 
+### P7 — One brand material, applied to the chrome only
+
+The chrome (topbar, rail, inspector, statusbar, board toolbar) is a single translucent material:
+`--glass-bg` / `--glass-bg-strong` tint + `blur(var(--glass-blur))` + a 1px hairline highlight.
+It stays neutral in hue — the accent appears in the chrome only in the brand mark, the wordmark
+gradient and the one primary button per region — so P6 still holds: the canvas is the brightest
+thing on screen.
+
+Brand tokens (Tier 2, `--brand-gradient`, `--brand-text-gradient`, `--glass-*`, `--glow-accent`,
+`--ambient-glow`) exist so no component hand-writes a gradient.
+
+**Brand assets.** The raven mark ships as transparent PNGs in `apps/web/public/brand/`
+(`favicon-32`, `raven-mark-{64,180,192,512}`) and is used for the favicon, the apple-touch icon,
+the topbar lockup and the README header. The mark is always decorative (`alt=""`): the board
+title remains the only heading in the chrome.
+
 ---
 
 ## 2. Token architecture
@@ -178,15 +194,15 @@ packages/ui/tokens/
   --nx-neutral-950: oklch(93.3% 0.007 260.7); /* #E6E9EE */
   --nx-neutral-1000: oklch(97.9% 0.003 264.5); /* #F7F8FA */
 
-  /* ── Accent: "Signal Blue", desaturated, single family ───────────────────── */
-  --nx-accent-200: oklch(85.5% 0.048 263.1); /* #BFD0F0 */
-  --nx-accent-300: oklch(75.1% 0.087 264.5); /* #93AEE6 */
-  --nx-accent-400: oklch(65.5% 0.113 264.5); /* #6E8FD6 */
-  --nx-accent-500: oklch(59.4% 0.117 264.5); /* #5B7CC4 */
-  --nx-accent-600: oklch(52% 0.11 265.4); /* #4A66A8 */
-  --nx-accent-700: oklch(43.5% 0.084 262.8); /* #38507F */
-  --nx-accent-800: oklch(33.4% 0.048 258.3); /* #27374F */
-  --nx-accent-900: oklch(26.1% 0.039 262.7); /* #1A2437 */
+  /* ── Accent: "Raven Azure", single family, sampled from the raven mark ────── */
+  --nx-accent-200: #cfe7fb;
+  --nx-accent-300: #8fcbf5; /* fg-accent — AA (≥ 8:1) on S0…S4 */
+  --nx-accent-400: #4faee9; /* border-focus — ≥ 3:1 non-text on every surface */
+  --nx-accent-500: #2f95d6;
+  --nx-accent-600: #2176ae; /* accent-solid — white text on it is AA (4.6:1) */
+  --nx-accent-700: #1a5a85;
+  --nx-accent-800: #143f5c;
+  --nx-accent-900: #102e42;
 
   /* ── Semantic hues ───────────────────────────────────────────────────────── */
   --nx-info-400: oklch(71% 0.093 244.6); /* #6EA8D8 */

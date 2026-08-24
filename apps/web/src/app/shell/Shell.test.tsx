@@ -45,4 +45,13 @@ describe('Shell', () => {
     const focusable = screen.getByRole('link', { name: /skip to content/i });
     expect(focusable).toBeInTheDocument();
   });
+
+  it('shows the brand lockup with a decorative (non-announced) mark', () => {
+    renderShell({ projects: [{ id: 'p1', name: 'Alpha' }], boardTitle: 'Case 12' });
+    const lockup = screen.getByTestId('brand-lockup');
+    expect(lockup).toHaveTextContent('Raven OSINT');
+    // The mark is decorative: the board title stays the only heading in the chrome.
+    expect(lockup.querySelector('img')).toHaveAttribute('alt', '');
+    expect(screen.getByRole('heading', { name: 'Case 12' })).toBeInTheDocument();
+  });
 });

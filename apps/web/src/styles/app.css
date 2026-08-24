@@ -14,13 +14,51 @@
     text-rendering: optimizeLegibility;
   }
 
+  /* The chrome is one continuous piece of glass over the void: a translucent tint, a hairline
+     top highlight and a blur. It never repeats the flat --surface-2 grey (04 §3.6). */
   .nx-topbar {
+    position: relative;
     display: flex;
     align-items: center;
     gap: var(--nx-space-3);
     padding-inline: var(--nx-space-3);
-    background: var(--surface-2);
+    background: var(--glass-bg-strong);
+    backdrop-filter: blur(var(--glass-blur));
     border-bottom: 1px solid var(--border-subtle);
+    box-shadow: inset 0 1px 0 var(--glass-highlight);
+  }
+
+  /* Brand lockup: the raven mark plus the wordmark, sitting left of the org switcher. */
+  .nx-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--nx-space-2);
+    padding-inline-end: var(--nx-space-3);
+    border-right: 1px solid var(--border-subtle);
+    text-decoration: none;
+  }
+
+  .nx-brand-mark {
+    width: var(--nx-size-sm);
+    height: var(--nx-size-sm);
+    object-fit: contain;
+    filter: drop-shadow(0 1px 6px color-mix(in oklab, var(--nx-accent-400) 45%, transparent));
+  }
+
+  .nx-brand-word {
+    font: var(--text-body);
+    font-weight: var(--nx-weight-semibold);
+    letter-spacing: var(--tracking-title);
+    text-transform: uppercase;
+    background: var(--brand-text-gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .nx-brand-word-soft {
+    color: var(--fg-muted);
+    font-weight: var(--nx-weight-medium);
   }
 
   /* The board name is the one piece of content in the chrome, so it gets the only non-muted
@@ -44,7 +82,8 @@
   }
 
   .nx-rail {
-    background: var(--surface-1);
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
     border-right: 1px solid var(--border-subtle);
     padding: var(--nx-space-4);
     overflow-y: auto;
@@ -78,8 +117,20 @@
     background: var(--canvas-void);
   }
 
+  /* One faint accent bloom from the top edge gives the void depth without touching the canvas
+     layer itself (it must stay a pure paint target for the engine). Pointer-transparent. */
+  .nx-surface::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--ambient-glow);
+    pointer-events: none;
+    z-index: 0;
+  }
+
   .nx-inspector {
-    background: var(--surface-1);
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
     border-left: 1px solid var(--border-subtle);
     padding: var(--nx-space-4);
     color: var(--fg-muted);
@@ -91,7 +142,8 @@
     align-items: center;
     gap: var(--nx-space-4);
     padding-inline: var(--nx-space-4);
-    background: var(--surface-2);
+    background: var(--glass-bg-strong);
+    backdrop-filter: blur(var(--glass-blur));
     border-top: 1px solid var(--border-subtle);
     color: var(--fg-muted);
   }
@@ -221,9 +273,18 @@
     background: var(--surface-3, rgba(255, 255, 255, 0.15));
   }
 
+  /* The board toolbar is a floating glass strip, not a row of loose buttons: one rounded
+     container, hairline border, blur, and tighter gaps so the group reads as a single control. */
   .nx-toolbar {
     display: flex;
-    gap: var(--nx-space-4);
+    align-items: center;
+    gap: var(--nx-space-2);
+    padding: var(--nx-space-1);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--nx-radius-3);
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    box-shadow: var(--nx-shadow-2);
   }
 
   .nx-checkbox,

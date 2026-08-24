@@ -212,6 +212,20 @@ export function Shell({
     <div className="nx-app">
       <SkipToContent targetId="nx-main">Skip to content</SkipToContent>
       <header className="nx-topbar">
+        <span className="nx-brand" data-testid="brand-lockup">
+          <img
+            className="nx-brand-mark"
+            src={`${import.meta.env.BASE_URL}brand/raven-mark-64.png`}
+            alt=""
+            width={28}
+            height={28}
+            decoding="async"
+          />
+          {/* The product name is decorative next to the mark; the board title stays the h1. */}
+          <span className="nx-brand-word">
+            Raven <span className="nx-brand-word-soft">OSINT</span>
+          </span>
+        </span>
         <Menu trigger={<Button variant="ghost">{orgName}</Button>}>
           <MenuItem>{orgName}</MenuItem>
         </Menu>
