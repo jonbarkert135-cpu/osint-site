@@ -7,14 +7,32 @@
  * and why. Nothing executes here: the layer proposes, the analyst commits.
  */
 
+import { newId } from '@nexus/domain';
+import { applyProposal } from '@nexus/integrations';
 import { planQuery } from '@nexus/query-engine';
-import { createCatalogRegistry, type EntityKind, type ExecutionMode } from '@nexus/transforms';
+import {
+  createCatalogRegistry,
+  type EntityKind,
+  type ExecutionMode,
+  type HostFetch,
+} from '@nexus/transforms';
 import { Button } from '@nexus/ui';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type * as Y from 'yjs';
+
+import { ProposalReview } from '../integrations/ProposalReview.tsx';
+import { toImportProposal } from './investigationProposal.ts';
+import { useQueryRun } from './useQueryRun.ts';
 
 export interface AskPanelProps {
   open: boolean;
   onClose: () => void;
+  /** Absent in surfaces with no board (the panel then plans but cannot land results). */
+  doc?: Y.Doc;
+  boardId?: string;
+  onUndo?: () => void;
+  /** Injected by tests and by deployments that route provider traffic through the egress proxy. */
+  hostFetch?: HostFetch;
 }
 
 const REASON_LABELS: Record<string, string> = {
@@ -32,10 +50,12 @@ const REASON_LABELS: Record<string, string> = {
   'budget-exhausted': 'over budget',
 };
 
-export function AskPanel({ open, onClose }: AskPanelProps) {
+export function AskPanel({ open, onClose, doc, boardId, onUndo, hostFetch }: AskPanelProps) {
   const [raw, setRaw] = useState('');
   const [override, setOverride] = useState<EntityKind | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [applied, setApplied] = useState<string | null>(null);
+  const runner = useQueryRun(hostFetch === undefined ? {} : { fetch: hostFetch });
 
   // The panel is opened from the palette, so the caret must land in the field: the alternative is
   // typing into the board's single-key shortcuts. `autoFocus` is banned by jsx-a11y, this is not.
@@ -63,9 +83,41 @@ export function AskPanel({ open, onClose }: AskPanelProps) {
     [registry, raw, mode, override],
   );
 
+  const investigation = runner.result;
+
+  // The run is a proposal, not a write (U7/N4): it goes through the same review + apply path as an
+  // integration import, so it is previewable, per-item selectable and one undo step.
+  const proposal = useMemo(
+    () =>
+      investigation === null || boardId === undefined
+        ? null
+        : toImportProposal(investigation, { boardId, runId: newId.board() }),
+    [investigation, boardId],
+  );
+
+  const apply = useCallback(
+    (selectedItemIds: string[]) => {
+      if (proposal === null || doc === undefined) return;
+      const outcome = applyProposal(doc, proposal, {
+        selectedItemIds,
+        conflictResolutions: {},
+        placement: 'radial',
+        newId: () => newId.board(),
+        now: new Date().toISOString(),
+      });
+      setApplied(
+        `Added ${String(outcome.createdNodeIds.length)} node(s) and ${String(outcome.createdEdgeIds.length)} edge(s).`,
+      );
+      runner.reset();
+    },
+    [proposal, doc, runner],
+  );
+
   if (!open) return null;
 
   const steps = result.plan?.steps ?? [];
+  // `result` *is* the query plan (input + chosen candidate + transform plan); the executor takes it whole.
+  const plan = result;
 
   return (
     <aside className="nx-ask-panel" aria-label="Ask Raven" data-testid="ask-panel">
@@ -135,6 +187,77 @@ export function AskPanel({ open, onClose }: AskPanelProps) {
           })}
         </ol>
       )}
+
+      {steps.length > 0 && runner.phase !== 'done' ? (
+        <div className="nx-ask-actions">
+          {runner.phase === 'running' ? (
+            <Button variant="secondary" onClick={runner.stop} data-testid="ask-stop">
+              Stop
+            </Button>
+          ) : (
+            <Button
+              data-testid="ask-run"
+              onClick={() => {
+                setApplied(null);
+                void runner.run(plan);
+              }}
+            >
+              Run plan
+            </Button>
+          )}
+          {runner.phase === 'running' ? (
+            <span className="nx-muted" data-testid="ask-progress">
+              {String(runner.found)} found
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
+      {runner.steps.length > 0 ? (
+        <ul className="nx-ask-run" data-testid="ask-run-steps">
+          {runner.steps.map((step) => (
+            <li key={step.transform} data-state={step.state}>
+              <span className="nx-ask-step">
+                {registry.transform(step.transform)?.name ?? step.transform}
+              </span>
+              <span className="nx-muted">
+                {step.state} · {step.detail}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {runner.error !== null ? (
+        <p role="alert" data-testid="ask-error">
+          {runner.error}
+        </p>
+      ) : null}
+
+      {applied !== null ? (
+        <p role="status" data-testid="ask-applied">
+          {applied}{' '}
+          {onUndo === undefined ? null : (
+            <Button variant="secondary" onClick={onUndo}>
+              Undo
+            </Button>
+          )}
+        </p>
+      ) : null}
+
+      {proposal !== null && doc !== undefined ? (
+        <ProposalReview
+          proposal={proposal}
+          integrationName="Ask Raven"
+          onApply={apply}
+          onDiscard={runner.reset}
+        />
+      ) : investigation !== null ? (
+        <p className="nx-muted" data-testid="ask-no-board">
+          The run finished with {String(investigation.entities.length)} entities. Open a board to
+          land them on a canvas.
+        </p>
+      ) : null}
 
       {result.hidden.length > 0 ? (
         <p className="nx-muted" data-testid="ask-hidden">

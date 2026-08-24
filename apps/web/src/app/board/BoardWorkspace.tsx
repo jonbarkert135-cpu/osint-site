@@ -837,7 +837,13 @@ export function BoardWorkspace() {
         ) : null}
       </Suspense>
 
-      <AskPanel open={askOpen} onClose={() => setAskOpen(false)} />
+      <AskPanel
+        open={askOpen}
+        onClose={() => setAskOpen(false)}
+        doc={doc}
+        boardId={boardId}
+        onUndo={() => history.undo()}
+      />
 
       <GroupsPanel
         open={groupsOpen}
