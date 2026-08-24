@@ -496,3 +496,25 @@ k6 на стейджинге, полный сбор метрик и алерто
 - **Plugin SDK (раздел 33):** панели/секции инспектора/контекстное меню от плагина (нужен iframe-хост), собственные типы узлов на холсте, экран настроек плагина, `graph.propose()`, установка из реестра вместо записи в localStorage.
 - **Единый запрос (P17):** 🟡 приём, план, **исполнение** и вывод в UI есть (2026-08-24). `packages/query-engine`: `typeQuery` (типизация ввода), `planQuery` (план поверх transform-слоя), `executePlan`/`runPlan` — потоковое исполнение плана по стадиям с параллелизмом из бюджета, fallback по цепочке движков, кэшем результатов, отменой, бюджетами узлов и времени, записями прогонов (`RunRecord`) и провенансом на каждом узле; `normalize.ts` (канонизация + identity key) и `resolve.ts` (дедуп, корроборация noisy-OR по независимым провайдерам, связи). События: `plan.started`, `stage.started`, `step.started|skipped|failed|done`, `entity.found`, `relation.found`, `plan.done`. Поток исполнения выведен в «Ask Raven» и узлы приземляются на холст (2026-08-24, PR `feat/ask-run`): `apps/web/src/query/useQueryRun.ts` (хук + чистый `reduceEvent`, фазы idle/running/done/failed, Run/Stop), `investigationProposal.ts` (события прогона → `ImportProposal` с провенансом, TTL 7 дней, отсев низкой уверенности) и `hostFetch.ts` (https-only allowlist crt.sh/rdap.org/dns.google/cloudflare-dns.com, `credentials: 'omit'`, лимит 4 MiB, проброс отмены). Приземление идёт только через обычный review-путь (`ProposalReview` → `applyProposal`, radial-раскладка, один шаг undo) — инвариант N4 сохранён. Не сделано: серверный egress-прокси (браузерный CORS может блокировать провайдеров — шаг падает, прогон деградирует, U5), выводимые связи (§7.5), вероятностное разрешение сущностей (§7.2, Fellegi–Sunter), circuit breaker и ретраи (§6.1), бенчмарки `bench/query/`.
 - **Слой transform'ов (L4.2–L4.7):** движки исполняются (2026-08-24). Встроенные keyless-движки в `sdk/engines`: `doh-resolver`, `ct-log-search` (crt.sh), `rdap-lookup` — все проходят conformance-харнесс; `BUILTIN_ENGINES` связывает `EngineId` каталога с реализацией, отсутствующая реализация просто уступает следующему звену цепочки. Кэш и история прогонов подключены исполнителем. Нужны: UX разворачивания на холсте, хранилище ключей, движки, требующие ключа или подпроцесса.
+
+## Часть 2, пачка §1–§10 — проверенный аудит экосистемы и конкурентов (2026-08-24)
+
+Документы (код не менялся): `22_ECOSYSTEM_AUDIT.md` §10, `23_COMPETITOR_MATRIX.md` §8,
+`26_OPEN_SOURCE_REGISTRY.md` §2.3/§3.2/§5, новый `28_PART2_COVERAGE.md` (карта §1–§10 → где лежит + дыры).
+
+- ✅ §1–§6: живой аудит 2026-08-24 (GitHub Releases/PyPI/npm/crates/вендорские страницы) по discovery,
+  documents/images/code, search/graph/AI и 27 конкурентам; тиры A–E и Integration Score /100.
+- ✅ §7: реестр получил спецификацию системы (шесть read-only watcher-джоб, intake кандидатов, veto-гейты).
+  **Кода нет** — джобы в `apps/worker` не написаны.
+- ✅ §8/§9/§10: покрыты `10_INTEGRATIONS.md` §3/§8 и `24_UNIFIED_QUERY.md` §3–§5, §10–§11.
+- ❌ Главная дыра прежняя: **исполнителя `QueryPlan` нет** — роутер и план остаются теорией.
+
+Важные последствия аудита:
+
+1. **SpiderFoot понижен до Tier D** (последний релиз v4.0, 2022-04-07; проект куплен Intel 471). Ни один
+   пункт роадмапа не должен считать его доступным; capability пересобирается из subfinder + dnsx + httpx +
+   theHarvester + Sherlock/Maigret + публичных API.
+2. **PhoneInfoga** — автор объявил проект неподдерживаемым, запрещён. **PyMuPDF** — AGPL-3.0, не MIT.
+   **Kuzu** архивирован, **RedisGraph** закрыт, **Bing Web Search API** ретайрнут, `@xenova/transformers` мёртв.
+3. Из браузера напрямую (CORS) реально работают только DoH JSON, RDAP, GLEIF и Wikidata — потолок
+   `APP_MODE=local` без раннера.

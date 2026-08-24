@@ -184,3 +184,102 @@ migration target rather than another silo.
    must be sourced first.
 8. **User complaints** should be sourced from real forums (r/OSINT, product communities, review
    sites) rather than recollection, before §4 hardens into product decisions.
+
+---
+
+## 8. Verified competitor pass — 2026-08-24
+
+**Provenance.** Every claim in this section was checked against a primary vendor page (pricing,
+product, docs) or an independent review on **2026-08-24** via live web search. It supersedes the
+unverified cells above wherever the two disagree. Prices move; re-verify anything older than 90 days
+before it enters a deck, a plan or a pricing decision.
+
+### 8.1 The matrix (Part 2 §5 columns)
+
+| Product                        | Category                 | Best features                                                  | Weaknesses                                           | Open source         | Self-hosted        | API                     | Plugin friendly      | Architecture                    | UX                      | Relevance to Raven                      |
+| ------------------------------ | ------------------------ | -------------------------------------------------------------- | ---------------------------------------------------- | ------------------- | ------------------ | ----------------------- | -------------------- | ------------------------------- | ----------------------- | --------------------------------------- |
+| Maltego                        | Link analysis / OSINT    | Transform Hub (~96 integrations), Machines, mature graph UX    | Opaque credit pricing, desktop-first                 | no (free CE tier)   | partial (TDS)      | yes (Transform SDK)     | yes                  | property graph + transforms     | desktop, steep curve    | high — the marketplace model            |
+| SpiderFoot / HX                | OSINT automation         | 200+ modules, free core, HX monitoring & alerts                | OSS edition is single-user, core unmaintained (§8.3) | yes (MIT core)      | yes                | partial (HX)            | yes (Python modules) | modular, event-driven           | web UI / CLI            | high — OSS→cloud monetization pattern   |
+| Hunchly                        | Evidence capture         | Auto SHA-256 page capture, court-ready exports                 | Chrome-only, no collaboration, no graph              | no                  | yes (local store)  | no                      | no                   | linear case file                | simple, single-user     | medium — evidence module inside a node  |
+| IBM i2 Analyst's Notebook      | Link analysis (gov/LE)   | TextChart, data connectors, maturity                           | Legacy UX, multi-SKU licensing                       | no                  | yes (Analysis Hub) | partial (connector kit) | limited              | proprietary chart model         | desktop, complex        | medium — the data-connector pattern     |
+| Palantir Gotham                | Enterprise intel         | Data fusion at scale, AI ops                                   | Astronomical price, lock-in                          | no                  | yes (air-gapped)   | yes                     | limited              | ontology + Foundry hybrid       | analyst-grade, high bar | low segment fit, useful ambition bar    |
+| DataWalk                       | Investigative graph+AI   | Unified graph (LPG+RDF+OLAP+vector), no-code entity resolution | Undisclosed price, weaker brand                      | no                  | yes (cluster)      | yes (JDBC/ODBC)         | yes (App Center)     | hybrid graph engine             | no-code visual          | high — hybrid graph model               |
+| Linkurious                     | Graph visualization      | Transparent two-tier pricing, DB-agnostic                      | Stores no data itself                                | no                  | yes                | yes (REST + webhooks)   | yes                  | viz layer over a graph DB       | web, intuitive          | high — honest pricing                   |
+| Siren                          | Search-led investigation | Semantic search, billions of records, mobile                   | Undisclosed price, LE-focused                        | no                  | yes                | yes                     | yes                  | Elasticsearch + Federate        | search-first            | medium — search-first pattern           |
+| Nuix Investigate               | Forensics / eDiscovery   | Reviewer scale, communication-pattern views                    | Not an OSINT graph, complex licensing                | no                  | yes                | limited                 | no                   | document indexing               | web reviewer            | low — adjacent category                 |
+| Skopenow                       | Fraud/threat OSINT SaaS  | Confidence scoring on individual facts, auto-aggregation       | Undisclosed price, narrow focus                      | no                  | no                 | limited                 | no                   | pipeline + models               | simple                  | medium — per-fact confidence UI         |
+| Liferaft Navigator             | Threat monitoring        | AI dedupe, insights digest, deep/dark web                      | No graph canvas, undisclosed price                   | no                  | no                 | limited                 | no                   | monitoring/alert engine         | dashboard-centric       | medium — noise-reduction pattern        |
+| ShadowDragon Horizon/SocialNet | Collection & monitoring  | Alias resolution across 200+ platforms, OIMonitor, snapshots   | Sales-gated, expensive                               | no                  | no                 | as a data source        | yes (inside Maltego) | real-time collection            | web, sales-gated        | high — watchlist/monitoring pattern     |
+| Recorded Future                | Threat intelligence      | One Intelligence Graph behind many products                    | Narrow cyber-TI niche, expensive                     | no                  | no                 | yes                     | yes (SIEM/SOAR)      | single graph + solution modules | enterprise dashboard    | medium — "one graph, many products"     |
+| Intelligence X                 | Leak/darkweb search      | Full breach records, permanent archive, public pricing         | Not real-time, legal grey zone                       | no                  | no                 | yes (Search + Leaks)    | limited              | index + archive                 | simple search           | medium — transparent pricing example    |
+| OSINT Industries               | Selector enrichment      | Transparent credits, real-time lookups                         | Narrow, no graph                                     | no                  | no                 | yes (upper tiers)       | modular sources      | real-time API aggregator        | very simple             | high — credit + add-on monetization     |
+| Obsidian (+ Canvas)            | PKM / canvas             | 1200+ plugins, local-first, offline                            | No native realtime collaboration                     | no (partly visible) | yes (default)      | limited (plugin API)    | yes (huge ecosystem) | markdown files + link graph     | tinkerable              | medium — plugin ecosystem model         |
+| Notion                         | Cloud workspace/canvas   | Realtime collaboration, database views                         | Cloud-only, no offline-first                         | no                  | no                 | yes (REST)              | yes                  | pages + databases               | polished but complex    | medium — collaboration UX benchmark     |
+| Milanote                       | Visual board             | Effortless drag-drop ideation                                  | Few integrations                                     | no                  | no                 | limited                 | limited              | board-based                     | very simple             | low                                     |
+| Miro                           | Enterprise whiteboard    | MCP server (agent-native), 250+ integrations                   | Costly at scale, not for structured graphs           | no                  | no                 | yes (REST + MCP)        | yes                  | canvas engine + AI workflows    | polished enterprise     | high — the MCP pattern                  |
+| Kumu                           | Relationship mapping     | Rich narrative per node/edge, focus mode                       | Weak API, no OSINT data                              | no                  | yes (enterprise)   | limited                 | limited              | graph + narrative layer         | presentation-focused    | high — presentation/report views        |
+| tldraw                         | Canvas SDK               | Production-grade multiplayer canvas out of the box             | An SDK, not a product; paid licence                  | source-available    | yes (embeddable)   | yes (runtime API)       | yes                  | React canvas engine             | developer-facing        | high — canvas-engine table-stakes bar   |
+| Heptabase                      | AI research whiteboard   | AI "reads with you", cited answers, self-hosted embeddings     | Not built for team investigations                    | no                  | no                 | limited (CLI)           | limited              | cards + whiteboard + AI         | polished                | high — AI panel pattern                 |
+| Logseq                         | Local-first outliner     | Genuinely open source, hosted-only monetization                | DB version still beta                                | yes                 | yes (default)      | limited                 | yes                  | markdown/SQLite + outline graph | power-user              | medium — open-core model                |
+| Perplexity Deep Research       | AI search/research       | Fast (2–4 min), cheap, browser agent                           | Weaker on non-obvious findings                       | no                  | no                 | limited                 | no                   | LLM + web retrieval             | chat-first              | high — the speed/price benchmark        |
+| Elicit                         | AI systematic review     | PRISMA-grade extraction, unified credit pool                   | Narrow academic niche                                | no                  | no                 | yes (enterprise)        | limited              | LLM + academic corpus           | specialised workflow    | medium — unified usage pool             |
+| Exa Websets                    | Agentic search API       | Criteria verification + enrichment, usage-based pricing        | Not an end-user product, slow queries                | no                  | no                 | yes (API-first)         | yes (SDK)            | search → verify → enrich        | developer/dashboard     | high — direct pattern for Raven's agent |
+| OpenAI / Gemini Deep Research  | Agentic research         | Shows the plan before executing, workspace context             | Embedded in a general product                        | no                  | no                 | limited (MCP)           | yes (MCP, OpenAI)    | multi-step reasoning agent      | chat + report           | medium — plan-before-execute UX         |
+
+### 8.2 Verified pricing anchors (2026-08-24)
+
+Only figures that were read off a vendor or independent-review page are listed. Everything else is
+deliberately absent rather than guessed.
+
+| Product                                                              | Verified pricing signal                                                                                                        |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Maltego                                                              | Community free; Professional credit-based (Standard 20k / Advanced 40k credits) from ~€7,500/yr; >5 seats → Enterprise, quoted |
+| SpiderFoot HX                                                        | Annual only, three tiers (Freelancer 15 scans/mo, 1 user; Business 50 scans/mo, 3 users; Enterprise custom)                    |
+| Hunchly                                                              | ~$129.99/yr Classic (local storage); cloud storage priced separately                                                           |
+| ShadowDragon                                                         | Sales-gated; monitoring tier widely reported in the tens of thousands per year — treat as an order of magnitude, not a quote   |
+| Intelligence X                                                       | Public tiered pricing for search + leaks API                                                                                   |
+| OSINT Industries                                                     | Public credit-based tiers with add-on sources                                                                                  |
+| Linkurious                                                           | Public two-tier model (managed vs self-managed)                                                                                |
+| Palantir, DataWalk, Siren, Nuix, Skopenow, Liferaft, Recorded Future | No public price. Quote-only.                                                                                                   |
+
+### 8.3 Findings that change our plans
+
+1. **SpiderFoot's open-source core is effectively unmaintained** — last release v4.0 on 2022-04-07;
+   the project was acquired by Intel 471 and an open issue titled "Project Dead?" stands unanswered.
+   It may stay a _reference_ for module breadth and for the OSS→cloud business pattern, but it must
+   not be a load-bearing engine. See `26_OPEN_SOURCE_REGISTRY.md` §2.3, now demoted.
+2. **The "honest pricing" gap is real.** Every graph-capable competitor except Linkurious and
+   Intelligence X hides its price. A public price _plus_ a self-hosted option is a rare combination
+   and a genuine wedge.
+3. **Agent-native access is becoming table stakes.** Miro already ships an MCP server; OpenAI ships
+   MCP support. Raven should expose the canvas over MCP alongside the plugin SDK.
+4. **Nobody combines verification + explanation + suggestion.** Exa verifies results against
+   criteria, Heptabase explains with citations, Maltego Machines suggest next steps — no product
+   does all three on one investigation graph. That combination is Raven's differentiator.
+
+### 8.4 White space (five unserved niches)
+
+1. A graph-capable investigation canvas with **public** per-seat/credit pricing for SMB and
+   independent investigators — between OSINT Industries (no graph) and Maltego Enterprise/Palantir.
+2. **AI-verified auto-enrichment inside the canvas**: click a node → the agent searches, verifies
+   against criteria and attaches entities with explainable confidence.
+3. **Affordable persistent identity monitoring** — today an enterprise-only module.
+4. A **presentation/storytelling layer over an investigation graph** (client and court-facing
+   reports straight from the canvas).
+5. **Open-core, self-hosted, agent-native** investigation canvas — open-core exists (Logseq),
+   agent-native exists (Miro/tldraw); nobody ships both for investigations.
+
+### 8.5 Table stakes, re-confirmed
+
+Full-text + fuzzy graph search · no-code/visual query builder · geospatial and temporal views ·
+entity resolution · report export (PDF/CSV/MD) · record- and field-level RBAC · change alerts and
+monitoring · API + webhooks · undo/redo, multiplayer cursors, copy-paste · a plugin/transform
+ecosystem. Against our tracker (`25_IMPLEMENTATION_STATUS.md`) the still-open ones are: alternative
+views (§31/§32), export beyond `.raven`/JSON (§29), monitoring, and the plugin SDK.
+
+### 8.6 Verification backlog, updated
+
+Items 7 and 8 of §7 are now partly discharged (pricing anchors above are sourced; the weakness
+column draws on vendor docs and independent reviews). Still open and unverified: tldraw's licence
+terms, the FollowTheMoney spec, OpenCTI's connector contract, the Obsidian `.canvas` format, and
+Affine's status. No decision may rest on those five until each is read at the source.

@@ -311,3 +311,109 @@ None of the audited projects provide these; every one of them is Raven-owned pro
 - Tier D/E entries are kept deliberately, with the reason, because the failure mode this file exists
   to prevent is adopting something that a tutorial, a listicle or a model's memory still recommends
   long after it died.
+
+---
+
+## 10. Re-verification pass — 2026-08-24
+
+A second live pass (GitHub releases API, PyPI/npm/crates, vendor pricing and licence pages) covering
+categories A–E plus documents/images/code. Where a row below disagrees with §2–§6, **this section
+wins**. Anything not re-checked keeps its 2026-08-19 dating and must be treated as ageing.
+
+### 10.1 Category A — discovery, verified passports
+
+| Tier | Project             | Licence                       | Latest / last release      | Score | Note                                                                  |
+| ---- | ------------------- | ----------------------------- | -------------------------- | ----- | --------------------------------------------------------------------- |
+| A    | subfinder           | MIT                           | v2.16.0, 2026-08-22        | 90    | passive subdomain enumeration; keyless core                           |
+| A    | OWASP Amass         | Apache-2.0                    | v5.1.1, 2026-04-07         | 88    | deep attack-surface graph, thinks in graphs                           |
+| A    | dnsx                | MIT                           | v1.3.0, 2026-07-16         | 88    | DNS resolution/enrichment                                             |
+| A    | httpx               | MIT                           | v1.10.0, 2026-07-09        | 87    | HTTP probing/fingerprinting                                           |
+| A    | theHarvester        | **GPL-3.0**                   | 4.11.1, 2026-06-03         | 85    | subprocess only — never linked or vendored                            |
+| A    | Sherlock            | MIT                           | v0.16.0, 2025-09-16        | 84    | username discovery; Python ≥3.10                                      |
+| A    | Maigret             | MIT                           | v0.6.4, ~2026-08           | 82    | richer username profiling, 3000+ sites                                |
+| A    | katana              | MIT                           | v1.7.0, 2026-08-05         | 83    | crawler; active fetching → authorization gate                         |
+| B    | naabu               | MIT (GPL probe data excluded) | v2.6.1, ~2026-05           | 82    | port scanning — active scanner, gated                                 |
+| B    | dnstwist            | Apache-2.0                    | 20250130 (calver)          | 78    | typosquat permutations                                                |
+| B    | Blackbird           | **licence unconfirmed**       | rolling, commit 2025-07-13 | 70    | do not adopt until the LICENSE file is read                           |
+| B    | Naminter            | MIT                           | rolling, active 2025–26    | 68    | young WhatsMyName-based checker                                       |
+| A    | WhatsMyName dataset | CC BY-SA 4.0 (data)           | rolling                    | 80    | share-alike applies to the **data**; keep it as data, not a fork      |
+| C    | holehe              | **GPL-3.0**                   | v1.61, ~2 years quiet      | 55    | at risk; subprocess only                                              |
+| C    | recon-ng            | **GPL-3.0**                   | 5.1.2, upstream stagnant   | 55    | reference only                                                        |
+| D    | sn0int              | **GPL-3.0**                   | v0.26.1, 2024-09-15        | 48    | >1.5 years quiet                                                      |
+| D    | **SpiderFoot**      | MIT core                      | **v4.0, 2022-04-07**       | 45    | **demoted from a load-bearing engine** — see §10.5                    |
+| D    | PhoneInfoga         | GPL-3.0                       | v2.11.0                    | 40    | README: "stable but unmaintained", may be archived — **do not adopt** |
+
+Public data sources worth standing on: **GLEIF LEI** (CC0, no key, CORS-friendly), **RDAP** (IETF
+standard, JSON, usually CORS-open), **dns.google / cloudflare-dns DoH JSON** (callable straight from
+the browser — the only reliable in-browser discovery primitives), **Wikidata SPARQL** (CC0, needs an
+explicit User-Agent), **ipinfo Lite** (free tier), **crt.sh** (free but heavily rate-limited, ~5
+req/min per IP → server-side with cache only), **BGPView** (community-run, no SLA).
+
+BYOK commercial: Shodan, Censys, urlscan (Pro from ~$1,250/mo), **VirusTotal public API is
+non-commercial only** — a commercial deployment needs Premium, HIBP (from ~$3.90/mo),
+OpenCorporates (free key is share-alike; non-share-alike from ~£6,600/yr), WhoisXML (500 free).
+
+**In-browser (CORS) reality check.** Only DoH JSON, RDAP, GLEIF and Wikidata are reliably callable
+from the browser. Username/e-mail checks, crt.sh and most vendor APIs are not — they need the runner
+or the API process. Any UI design that assumes browser-side collection is wrong.
+
+### 10.2 Documents, images, code — licence landmines
+
+- **PyMuPDF is AGPL-3.0**, not MIT. Prefer `pdf.js` (browser), `pdfplumber`/`pdfminer.six` (server),
+  `docling` or `unstructured` for structured extraction.
+- **marker / surya (datalab-to)**: code is Apache-2.0 but the **model weights** are a modified AI
+  Pubs OpenRAIL-M — free only below a revenue/funding threshold. Weights carry their own licence.
+- **trufflehog is AGPL-3.0**, **cloc is GPL-2.0**, **licensee** drags in a Ruby runtime.
+- **libraries.io**: AGPL and its open dataset is abandoned — call npm / PyPI / crates.io / Docker Hub
+  registry APIs directly instead of an aggregator.
+- Dead or stalled, with replacements: pHash.org C++ (2013 → python `imagehash`), blockhash-js (2014),
+  face-api.js (author stopped → MediaPipe or `@vladmandic/face-api`, **unverified**), exif-js (2017),
+  `exifr` (last release 2021 — usable but flag it, fallback `exiftool` wrapper).
+- Recommended and active: pdf.js, docling, unstructured, tesseract.js, PaddleOCR, GLiNER, spaCy,
+  transformers.js, sharp/libvips, file-type, Magika, OpenCV.js, tree-sitter, scc/tokei, semgrep,
+  syft/grype/osv-scanner (or trivy), dependency-cruiser, cdxgen, gitleaks, jscpd.
+- **Runs in the browser via WASM**: pdf.js, tesseract.js, transformers.js, OpenCV.js,
+  web-tree-sitter, Magika. That set defines what the local-first mode can do with no server.
+
+### 10.3 Search, orchestration, graph, AI — corrections
+
+- **Bing Web Search API is retired** (Microsoft Learn marks the page retired/archived). Any plan that
+  assumed it is void.
+- **Kuzu is archived by its own team** — remove from the embedded-graph shortlist.
+- **RedisGraph is discontinued**; **Whoogle** is archived by its owner; Postlight Parser, Cayley,
+  `dedupe` and `recordlinkage` are stalled.
+- **`@xenova/transformers` is dead (since 2024-05); the maintained successor is
+  `@huggingface/transformers`** — easy and expensive to confuse.
+- Licences confirmed by reading LICENSE: n8n = Sustainable Use Licence (not OSI), Windmill = AGPLv3
+  - proprietary EE, Memgraph and ArangoDB = BUSL 1.1, SearXNG / Zingg / Firecrawl core = AGPL-3.0,
+    Neo4j Community = GPL-3.0. All of these are "point at as an external service", never vendored.
+- Working shortlist for phase 2: search — Tavily/Exa + Brave Search API + self-hosted SearXNG as
+  fallback; extraction — trafilatura + defuddle; crawling — Crawlee + Playwright; orchestration —
+  pg-boss for light jobs, Temporal if durable multi-step routing is needed; AI — pgvector +
+  `@huggingface/transformers` + LangGraph; graph — Apache AGE (Postgres extension) + Splink for
+  entity resolution; visualization — sigma.js + graphology, maplibre-gl + deck.gl, vis-timeline.
+
+### 10.4 Scoring method
+
+Integration Score /100 is a weighted expert judgement, not a computed metric: Maintenance 15,
+Security 15, Performance 15, Compatibility 10, API quality 10, Output quality 10, Community 10,
+Licence 10, Complexity 5. Two engines within ~5 points of each other are a tie — decide on licence
+and adapter cost, not on the number.
+
+### 10.5 Consequences for the build
+
+1. `26_OPEN_SOURCE_REGISTRY.md` §2.3 (spiderfoot) is demoted to Tier D and must not be presented as
+   the broad-sweep engine. The capability it was covering is re-composed from subfinder + dnsx +
+   httpx + theHarvester + public APIs, which are all actively maintained.
+2. Any GPL/AGPL engine (theHarvester, holehe, recon-ng, trufflehog, SearXNG, Firecrawl core) is
+   invoked as a **separate process or service** only — never linked, never vendored. This is already
+   the house rule in §1; the pass adds names to it.
+3. The browser-executable set (§10.1, §10.2) is the true ceiling of `APP_MODE=local` with no runner.
+   Product copy must not promise more than that offline.
+
+### 10.6 Not verified in this pass
+
+`@vladmandic/face-api`, `exiftool-vendored`, practical browser ONNX export for GLiNER, Docker Hub tag
+freshness, and direct GitHub-API confirmation for Scrapy, Selenium, Celery, sentence-transformers and
+Oxigraph (rate-limited at 60 req/h; versions taken from PyPI). All of these stay **unverified** until
+opened at the source.
