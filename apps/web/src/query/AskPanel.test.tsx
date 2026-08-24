@@ -6,6 +6,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
+import * as Y from 'yjs';
+
 import { AskPanel } from './AskPanel.tsx';
 
 describe('AskPanel', () => {
@@ -43,5 +45,19 @@ describe('AskPanel', () => {
 
     await user.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('runs the plan on request and proposes what it found instead of writing it', async () => {
+    const user = userEvent.setup();
+    const doc = new Y.Doc();
+    const hostFetch = vi.fn(() => Promise.resolve({ status: 200, body: [] }));
+
+    render(<AskPanel open onClose={vi.fn()} doc={doc} boardId="b1" hostFetch={hostFetch} />);
+    await user.type(screen.getByTestId('ask-input'), 'example.com');
+    await user.click(screen.getByTestId('ask-run'));
+
+    // The run is over: steps are reported, and the board was not touched by the run itself (U7).
+    expect(await screen.findByTestId('ask-run-steps')).toBeInTheDocument();
+    expect(doc.getMap('nodes').size).toBe(0);
   });
 });
