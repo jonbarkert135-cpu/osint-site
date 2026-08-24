@@ -207,7 +207,8 @@ export function AskPanel({ open, onClose, doc, boardId, onUndo, hostFetch }: Ask
           )}
           {runner.phase === 'running' ? (
             <span className="nx-muted" data-testid="ask-progress">
-              {String(runner.found)} found
+              {String(Math.round(runner.progress * 100))}% · {String(runner.found)} found
+              {runner.inFlight > 0 ? ` · ${String(runner.inFlight)} running in parallel` : ''}
             </span>
           ) : null}
         </div>
@@ -219,6 +220,20 @@ export function AskPanel({ open, onClose, doc, boardId, onUndo, hostFetch }: Ask
             <li key={step.transform} data-state={step.state}>
               <span className="nx-ask-step">
                 {registry.transform(step.transform)?.name ?? step.transform}
+              </span>
+              <span
+                className="nx-ask-bar"
+                role="progressbar"
+                aria-label={registry.transform(step.transform)?.name ?? step.transform}
+                aria-valuenow={Math.round(step.fraction * 100)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                data-testid={`ask-bar-${step.transform}`}
+              >
+                <span
+                  className="nx-ask-bar-fill"
+                  style={{ inlineSize: `${String(Math.round(step.fraction * 100))}%` }}
+                />
               </span>
               <span className="nx-muted">
                 {step.state} · {step.detail}

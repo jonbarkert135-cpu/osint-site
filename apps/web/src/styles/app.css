@@ -1535,6 +1535,32 @@
     font-size: var(--text-body-sm, 13px);
   }
 
+  /* Per-service progress (Part 2 §14): results arrive gradually, so the run must look alive. */
+  .nx-ask-bar {
+    display: block;
+    block-size: 4px;
+    border-radius: 999px;
+    background: var(--nx-surface-3, rgb(255 255 255 / 8%));
+    overflow: hidden;
+    margin-block: 4px;
+  }
+
+  .nx-ask-bar-fill {
+    display: block;
+    block-size: 100%;
+    border-radius: inherit;
+    background: var(--nx-accent, #4aa8ff);
+    transition: inline-size 220ms ease;
+  }
+
+  .nx-ask-run li[data-state='queued'] .nx-ask-bar-fill {
+    background: var(--nx-text-muted, rgb(255 255 255 / 30%));
+  }
+
+  .nx-ask-run li[data-state='failed'] .nx-ask-bar-fill {
+    background: var(--nx-danger, #ff6b6b);
+  }
+
   .nx-ask-run li[data-state='failed'] .nx-ask-step {
     text-decoration: line-through;
   }
