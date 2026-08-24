@@ -80,8 +80,10 @@ export const tokens = {
   },
   border: { hairline: '1px', thick: '1.5px', heavy: '2px' },
   font: {
-    sans: "'InterVariable', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
-    mono: "'JetBrainsMonoVariable', 'JetBrains Mono', ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', monospace",
+    display:
+      "'Manrope Variable', 'Manrope', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+    sans: "'Inter Tight Variable', 'InterVariable', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+    mono: "'JetBrains Mono Variable', 'JetBrainsMonoVariable', 'JetBrains Mono', ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', monospace",
   },
   weight: { regular: '400', medium: '500', semibold: '600', bold: '680' },
   shadow: {

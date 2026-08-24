@@ -9,6 +9,9 @@
     background: var(--surface-0);
     color: var(--fg-primary);
     font-family: var(--nx-font-sans);
+    font-optical-sizing: auto;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
   .nx-topbar {
@@ -23,9 +26,9 @@
   /* The board name is the one piece of content in the chrome, so it gets the only non-muted
      weight up here (04 §6.3: one emphasis per region). */
   .nx-topbar-title {
-    font: var(--text-body);
-    font-weight: var(--nx-weight-medium);
-    letter-spacing: var(--tracking-body);
+    font: var(--text-title);
+    font-weight: var(--nx-weight-semibold);
+    letter-spacing: var(--tracking-title);
     color: var(--fg-primary);
     margin-inline-start: var(--nx-space-2);
   }
@@ -872,9 +875,9 @@
 
   .nx-inspector-section h3 {
     margin: 0;
-    font: var(--text-body-sm);
+    font: var(--text-eyebrow);
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: var(--tracking-eyebrow);
     color: var(--fg-muted);
   }
 
@@ -936,9 +939,9 @@
   .nx-menu-heading {
     margin: 0;
     padding-inline: var(--nx-space-2);
-    font: var(--text-body-sm);
+    font: var(--text-eyebrow);
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: var(--tracking-eyebrow);
     color: var(--fg-muted);
   }
 

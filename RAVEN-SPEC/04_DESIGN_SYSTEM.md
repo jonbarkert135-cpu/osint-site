@@ -249,10 +249,12 @@ packages/ui/tokens/
   --nx-icon-3: 24px;
 
   /* ── Typography ──────────────────────────────────────────────────────────── */
-  --nx-font-sans: 'InterVariable', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
-    Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --nx-font-mono: 'JetBrainsMonoVariable', 'JetBrains Mono', ui-monospace, 'SFMono-Regular',
-    'Menlo', 'Consolas', 'Liberation Mono', monospace;
+  --nx-font-display: 'Manrope Variable', 'Manrope', ui-sans-serif, system-ui, -apple-system,
+    'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --nx-font-sans: 'Inter Tight Variable', 'InterVariable', 'Inter', ui-sans-serif, system-ui,
+    -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --nx-font-mono: 'JetBrains Mono Variable', 'JetBrainsMonoVariable', 'JetBrains Mono',
+    ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', monospace;
   --nx-weight-regular: 400;
   --nx-weight-medium: 500;
   --nx-weight-semibold: 600;
@@ -882,52 +884,46 @@ possible: `.nx-elev-3` in light mode resolves to white + a real shadow with no c
 
 ### 6.1 Fonts
 
-| Role    | Family                            | File                                                                                  | Fallback stack                                                                                     |
-| ------- | --------------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| UI sans | **Inter Variable** (OFL)          | `packages/ui/assets/fonts/InterVariable.woff2` (roman) + `InterVariable-Italic.woff2` | `ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif` |
-| Mono    | **JetBrains Mono Variable** (OFL) | `packages/ui/assets/fonts/JetBrainsMonoVariable.woff2`                                | `ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace`                      |
+| Role    | Family                            | Package                               | Fallback stack                                                                                     |
+| ------- | --------------------------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Display | **Manrope Variable** (OFL)        | `@fontsource-variable/manrope`        | `ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif` |
+| UI sans | **Inter Tight Variable** (OFL)    | `@fontsource-variable/inter-tight`    | same as above                                                                                      |
+| Mono    | **JetBrains Mono Variable** (OFL) | `@fontsource-variable/jetbrains-mono` | `ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace`                      |
 
-Self-hosted, no external font CDN (privacy requirement for an OSINT tool; see `15_SECURITY.md`).
-Both are variable fonts: two files cover weights 400–700, ~340 KB total, subset to
-`latin + latin-ext + cyrillic` (the client roadmap is Russian; the UI must render Cyrillic
-correctly without fallback substitution).
+Two text faces, on purpose: a display grotesque names things (brand, headings, section eyebrows)
+and a tighter text face carries everything read in volume. The pairing is what makes the chrome
+read as instrumentation rather than as a default web app, and it costs nothing at runtime — the
+display face appears only in chrome, so it is a few hundred glyphs on screen at most.
+
+Self-hosted, never a font CDN (privacy requirement for an OSINT tool; `15_SECURITY.md`) and never
+a network dependency (N2 local-first). Delivery is Fontsource: `apps/web/src/styles/fonts.css`
+imports the weight axis of each family (`wght.css`, no italic file), which declares one
+`@font-face` per unicode-range subset. All three families cover Latin, Latin-ext and Cyrillic — the
+UI must render Cyrillic without fallback substitution — and a Latin-only session downloads only the
+Latin subsets, roughly 60 KB in total.
 
 ```css
-@font-face {
-  font-family: 'InterVariable';
-  src: url('../assets/fonts/InterVariable.woff2') format('woff2-variations');
-  font-weight: 400 700;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: U+0000-00FF, U+0100-024F, U+0400-04FF, U+2000-206F, U+2190-21BB;
-}
-@font-face {
-  font-family: 'JetBrainsMonoVariable';
-  src: url('../assets/fonts/JetBrainsMonoVariable.woff2') format('woff2-variations');
-  font-weight: 400 700;
-  font-style: normal;
-  font-display: swap;
-}
+/* apps/web/src/styles/fonts.css */
+@import '@fontsource-variable/inter-tight/wght.css';
+@import '@fontsource-variable/manrope/wght.css';
+@import '@fontsource-variable/jetbrains-mono/wght.css';
+
 :root {
   font-synthesis: none; /* never fake bold/italic */
   -webkit-font-smoothing: antialiased; /* required: light-on-dark otherwise blooms */
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   font-variant-ligatures: none; /* UI text: no ligatures, they hurt scanning */
-  font-feature-settings:
-    'cv05' 1,
-    'ss03' 1,
-    'tnum' 0; /* Inter: single-storey l, curved r */
 }
 .nx-tabular {
   font-variant-numeric: tabular-nums;
 } /* mandatory in tables, counters, timers */
 ```
 
-Both fonts are preloaded in `apps/web/index.html` with `<link rel="preload" as="font" crossorigin>`
-so the first canvas paint is not re-laid-out by a font swap.
+Every face declares `font-display: swap`, so a first paint before the font file lands is a metric
+shift, never invisible text or a missing glyph.
 
-### 6.2 Type scale (9 steps)
+### 6.2 Type scale (11 steps)
 
 Sizes are px (not rem) because this is a fixed-density desktop application and the canvas mixes
 DOM text with canvas-drawn text that must match exactly. User zoom still works (browser zoom
@@ -935,26 +931,30 @@ scales px). A `--nx-font-scale` multiplier (0.9 / 1.0 / 1.15) is exposed in Sett
 and applied via `font-size` on `:root` with all steps declared in `em` internally; the table below
 is the 1.0 baseline.
 
-| #   | Token             | Role    | Size | Line-height  | Letter-spacing | Weight | Use                                          |
-| --- | ----------------- | ------- | ---- | ------------ | -------------- | ------ | -------------------------------------------- |
-| 1   | `--text-display`  | Display | 28px | 34px (1.21)  | -0.02em        | 600    | onboarding, empty-project hero only          |
-| 2   | `--text-title-lg` | Title L | 20px | 26px (1.30)  | -0.015em       | 600    | dialog titles, board title in header         |
-| 3   | `--text-title`    | Title   | 16px | 22px (1.375) | -0.01em        | 600    | panel titles, section headers                |
-| 4   | `--text-body-lg`  | Body L  | 15px | 22px (1.47)  | -0.005em       | 400    | long-form note editor body                   |
-| 5   | `--text-body`     | Body    | 13px | 18px (1.38)  | 0              | 400    | default UI text, menu items, inputs          |
-| 6   | `--text-body-sm`  | Body S  | 12px | 16px (1.33)  | +0.005em       | 400    | table cells, node metadata, dense lists      |
-| 7   | `--text-label`    | Label   | 11px | 14px (1.27)  | +0.02em        | 500    | field labels, column headers, tab labels     |
-| 8   | `--text-caption`  | Caption | 10px | 13px (1.30)  | +0.03em        | 500    | badges, timestamps, LOD-2 node subtitle      |
-| 9   | `--text-mono`     | Mono    | 12px | 18px (1.5)   | 0              | 400    | hashes, IDs, code, JSON payloads, CLI output |
+| #   | Token             | Role    | Size | Line-height  | Letter-spacing | Weight | Use                                                                      |
+| --- | ----------------- | ------- | ---- | ------------ | -------------- | ------ | ------------------------------------------------------------------------ |
+| 0   | `--text-hero`     | Hero    | 40px | 44px (1.10)  | -0.03em        | 600    | first-run and empty-workspace hero (display face)                        |
+| 1   | `--text-display`  | Display | 28px | 34px (1.21)  | -0.025em       | 600    | onboarding, empty-project hero (display face)                            |
+| 2   | `--text-title-lg` | Title L | 20px | 26px (1.30)  | -0.015em       | 600    | dialog titles, board title in header                                     |
+| 3   | `--text-title`    | Title   | 16px | 22px (1.375) | -0.01em        | 600    | panel titles, section headers                                            |
+| 4   | `--text-body-lg`  | Body L  | 15px | 22px (1.47)  | -0.005em       | 400    | long-form note editor body                                               |
+| 5   | `--text-body`     | Body    | 13px | 18px (1.38)  | 0              | 400    | default UI text, menu items, inputs                                      |
+| 6   | `--text-body-sm`  | Body S  | 12px | 16px (1.33)  | +0.005em       | 400    | table cells, node metadata, dense lists                                  |
+| 7   | `--text-label`    | Label   | 11px | 14px (1.27)  | +0.02em        | 500    | field labels, column headers, tab labels                                 |
+| 8   | `--text-caption`  | Caption | 10px | 13px (1.30)  | +0.03em        | 500    | badges, timestamps, LOD-2 node subtitle                                  |
+| 9   | `--text-eyebrow`  | Eyebrow | 10px | 14px (1.40)  | +0.18em        | 600    | upper-case region markers: panel and menu section headers (display face) |
+| 10  | `--text-mono`     | Mono    | 12px | 18px (1.5)   | 0              | 400    | hashes, IDs, code, JSON payloads, CLI output                             |
 
-Uppercase is allowed **only** at step 7 and 8 and only with `letter-spacing: +0.06em`. Never
-uppercase body text.
+Uppercase is allowed **only** through `--text-eyebrow` (and its `.nx-eyebrow` utility), which is
+the single sanctioned upper-case treatment: 10px, 600, +0.18em. The spacing carries the hierarchy,
+which is why the eyebrow can stay at `--fg-muted`. Never uppercase body text.
 
 ```css
 :root {
-  --text-display: 600 28px/34px var(--nx-font-sans);
-  --text-title-lg: 600 20px/26px var(--nx-font-sans);
-  --text-title: 600 16px/22px var(--nx-font-sans);
+  --text-hero: 600 40px/44px var(--nx-font-display);
+  --text-display: 600 28px/34px var(--nx-font-display);
+  --text-title-lg: 600 20px/26px var(--nx-font-display);
+  --text-title: 600 16px/22px var(--nx-font-display);
   --text-body-lg: 400 15px/22px var(--nx-font-sans);
   --text-body: 400 13px/18px var(--nx-font-sans);
   --text-body-sm: 400 12px/16px var(--nx-font-sans);
