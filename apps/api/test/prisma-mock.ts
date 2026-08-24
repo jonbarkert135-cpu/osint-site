@@ -38,6 +38,8 @@ export const prismaMock = {
     delete: vi.fn(),
     count: vi.fn(),
   },
+  repository: { findUnique: vi.fn(), findFirst: vi.fn() },
+  githubAnalysis: { findFirst: vi.fn() },
   runLogEntry: { findMany: vi.fn(), findFirst: vi.fn(), createMany: vi.fn() },
 };
 

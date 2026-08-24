@@ -29,6 +29,7 @@ function harness(routes: Record<string, HttpResponse>, rows: RepositoryNodeRow[]
   const patched: RepositoryData[] = [];
   const tabs: { tab: string; payload: unknown }[] = [];
   const hydrates: unknown[] = [];
+  const proposals: unknown[] = [];
   const store: GithubHandlerStore = {
     patchRepositoryNode: vi.fn(async (_nodeId, data) => {
       patched.push(data);
@@ -58,10 +59,13 @@ function harness(routes: Record<string, HttpResponse>, rows: RepositoryNodeRow[]
     enqueueHydrate: async (payload) => {
       hydrates.push(payload);
     },
+    enqueueProposal: async (payload) => {
+      proposals.push(payload);
+    },
     newId: () => 'proposal-1',
     now: () => NOW,
   });
-  return { handlers, store, requested, patched, tabs, hydrates };
+  return { handlers, store, requested, patched, tabs, hydrates, proposals };
 }
 
 const signal = new AbortController().signal;
@@ -214,6 +218,27 @@ describe('github.analyze', () => {
     expect(h.store.saveAnalysis).toHaveBeenCalledWith(
       expect.objectContaining({ repoKey: 'sherlock-project/sherlock', headSha: 'deadbeef' }),
     );
+  });
+
+  it('chains the proposal job onto the analysis it just stored', async () => {
+    const h = harness({
+      '/repos/sherlock-project/sherlock': ok(repoJson),
+      '/repos/sherlock-project/sherlock/git/trees/master?recursive=1': ok(
+        JSON.stringify({ sha: 'deadbeef', tree: [{ path: 'package.json', type: 'blob' }] }),
+      ),
+      '/repos/sherlock-project/sherlock/languages': ok(JSON.stringify({ Python: 1 })),
+    });
+    await h.handlers['github.analyze'](
+      {
+        repoKey: 'sherlock-project/sherlock',
+        headSha: 'deadbeef',
+        analyzerVersion: '1.0.0',
+        userId: 'u1',
+        boardId: 'b1',
+      },
+      signal,
+    );
+    expect(h.proposals).toEqual([{ analysisId: 'analysis-1' }]);
   });
 });
 

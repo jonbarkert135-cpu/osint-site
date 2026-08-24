@@ -5,7 +5,15 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { readLatestRepositoryAnalysis, type AnalysisRowClient } from '../github/analysisStore.ts';
+import {
+  ANALYZABLE_HOSTS,
+  isAnalyzableRepoKey,
+  readLatestRepositoryAnalysis,
+  REPO_KEY_PATTERN,
+  repositoryAnalysisJob,
+  type AnalysisRowClient,
+} from '../github/analysisStore.ts';
+import { GITHUB_QUEUE } from '../github/jobs.ts';
 
 const analysis = {
   repoKey: 'github.com/o/r',
@@ -86,5 +94,52 @@ describe('readLatestRepositoryAnalysis', () => {
     const { client } = clientOf({ payload: analysis, proposal: { id: 'p-1' } });
     const result = await readLatestRepositoryAnalysis(client, 'github.com/o/r');
     expect(result?.proposal?.id).toBe('p-1');
+  });
+});
+
+describe('isAnalyzableRepoKey', () => {
+  it('accepts a well-formed key on a supported host', () => {
+    expect(isAnalyzableRepoKey('github.com/acme/raven')).toBe(true);
+    expect(isAnalyzableRepoKey('github.com/acme/raven.osint-1')).toBe(true);
+  });
+
+  it('rejects an unsupported host', () => {
+    expect(isAnalyzableRepoKey('gitlab.com/acme/raven')).toBe(false);
+  });
+
+  it('rejects a malformed key', () => {
+    expect(isAnalyzableRepoKey('github.com/acme')).toBe(false);
+    expect(isAnalyzableRepoKey('GitHub.com/acme/raven')).toBe(false);
+    expect(isAnalyzableRepoKey('')).toBe(false);
+  });
+
+  it('lists github.com as analyzable', () => {
+    expect(ANALYZABLE_HOSTS).toContain('github.com');
+    expect(REPO_KEY_PATTERN.test('github.com/acme/raven')).toBe(true);
+  });
+});
+
+describe('repositoryAnalysisJob', () => {
+  const request = {
+    repoKey: 'github.com/acme/raven',
+    headSha: 'abc123',
+    analyzerVersion: '1',
+    userId: 'u1',
+    boardId: 'b1',
+  };
+
+  it('describes one github.analyze job carrying the request', () => {
+    const job = repositoryAnalysisJob(request);
+    expect(job.name).toBe('github.analyze');
+    expect(job.queue).toBe(GITHUB_QUEUE);
+    expect(job.payload).toEqual(request);
+  });
+
+  it('dedupes the same head and lets force through', () => {
+    const first = repositoryAnalysisJob(request);
+    const same = repositoryAnalysisJob(request);
+    const forced = repositoryAnalysisJob({ ...request, force: true });
+    expect(first.options).toEqual(same.options);
+    expect(forced.payload.force).toBe(true);
   });
 });

@@ -27,6 +27,10 @@ export interface RepositoryAnalysisPanelProps {
   proposal?: RepositoryProposalView | null;
   /** Present when the last analysis attempt failed; suppresses the analysis body. */
   error?: { title: string; detail: string } | null;
+  /** True from the moment an analysis is requested until a result (or a failure) comes back. */
+  analyzing?: boolean;
+  /** Requests a fresh analysis; `null` when the viewer may not run one. */
+  onAnalyze?: (() => void) | null;
   onRetry: () => void;
   onAnalyzeManually: () => void;
 }
@@ -76,6 +80,8 @@ export function RepositoryAnalysisPanel({
   analysis,
   proposal,
   error,
+  analyzing = false,
+  onAnalyze,
   onRetry,
   onAnalyzeManually,
 }: RepositoryAnalysisPanelProps) {
@@ -91,6 +97,17 @@ export function RepositoryAnalysisPanel({
     </Button>
   );
 
+  /**
+   * The one control that starts an analysis. Absent for a viewer (no editor rights), and disabled
+   * while a run is in flight so a second click cannot queue the same work twice.
+   */
+  const analyzeButton =
+    onAnalyze === null || onAnalyze === undefined ? null : (
+      <Button variant="primary" onClick={onAnalyze} disabled={analyzing} data-testid="analysis-run">
+        {analyzing ? 'Analyzing…' : analysis === null ? 'Analyze Repository' : 'Re-analyze'}
+      </Button>
+    );
+
   return (
     <section
       className="nx-analysis-panel"
@@ -99,8 +116,18 @@ export function RepositoryAnalysisPanel({
     >
       <header>
         <strong>{repoKey}</strong>
-        {openRepository}
+        <span className="nx-analysis-header-actions">
+          {analyzeButton}
+          {openRepository}
+        </span>
       </header>
+
+      {analyzing ? (
+        <p className="nx-muted" role="status" data-testid="analysis-running">
+          Analyzing this repository — reading its layout, entry points and dependencies. The result
+          appears here as soon as it is ready; you can keep working in the meantime.
+        </p>
+      ) : null}
 
       {error ? (
         <>
@@ -118,10 +145,12 @@ export function RepositoryAnalysisPanel({
           </div>
         </>
       ) : analysis === null ? (
-        <p className="nx-muted" data-testid="analysis-empty">
-          This repository has not been analyzed yet. Run the analysis to see its languages, entry
-          points and integration options.
-        </p>
+        analyzing ? null : (
+          <p className="nx-muted" data-testid="analysis-empty">
+            This repository has not been analyzed yet. Run the analysis to see its languages, entry
+            points and integration options.
+          </p>
+        )
       ) : (
         <>
           <div className="nx-analysis-grid" data-testid="analysis-facts">
