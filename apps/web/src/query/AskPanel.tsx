@@ -243,6 +243,54 @@ export function AskPanel({ open, onClose, doc, boardId, onUndo, hostFetch }: Ask
         </ul>
       ) : null}
 
+      {investigation !== null && investigation.entities.length > 0 ? (
+        <ul className="nx-ask-results" data-testid="ask-results">
+          {investigation.entities
+            .filter((entity) => !entity.seed)
+            .map((entity) => {
+              const refs = entity.sources.flatMap((source) => source.refs ?? []);
+              const url = refs.find((ref) => ref.url !== undefined)?.url;
+              const raw = refs.find((ref) => ref.raw !== undefined)?.raw;
+              return (
+                <li key={entity.id}>
+                  <span className="nx-ask-step">{entity.label ?? entity.value}</span>
+                  <span className="nx-muted">
+                    {entity.kind} · {entity.confidence.toFixed(2)} ·{' '}
+                    {[...new Set(entity.sources.map((source) => source.provider))].join(', ')}
+                  </span>
+                  {url === undefined ? null : (
+                    <a href={url} target="_blank" rel="noreferrer noopener">
+                      Open source
+                    </a>
+                  )}
+                  {raw === undefined ? null : (
+                    <details>
+                      <summary>View raw result</summary>
+                      <pre>{JSON.stringify(raw, null, 2).slice(0, 4000)}</pre>
+                    </details>
+                  )}
+                </li>
+              );
+            })}
+        </ul>
+      ) : null}
+
+      {investigation !== null && investigation.duplicates.length > 0 ? (
+        <ul className="nx-ask-dupes" data-testid="ask-duplicates">
+          {investigation.duplicates.map((hint) => {
+            const label = (id: string) =>
+              investigation.entities.find((entity) => entity.id === id)?.value ?? id;
+            return (
+              <li key={`${hint.a}|${hint.b}`}>
+                Possible duplicate: <strong>{label(hint.a)}</strong> ·{' '}
+                <strong>{label(hint.b)}</strong>{' '}
+                <span className="nx-muted">({hint.reason} — merge manually if you agree)</span>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+
       {runner.error !== null ? (
         <p role="alert" data-testid="ask-error">
           {runner.error}

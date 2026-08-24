@@ -60,4 +60,33 @@ describe('AskPanel', () => {
     expect(await screen.findByTestId('ask-run-steps')).toBeInTheDocument();
     expect(doc.getMap('nodes').size).toBe(0);
   });
+
+  it('keeps the raw provider result one click away from every finding (Part 2 §18, §19)', async () => {
+    const user = userEvent.setup();
+    const hostFetch = vi.fn((url: string) =>
+      Promise.resolve(
+        url.endsWith('type=A')
+          ? {
+              status: 200,
+              body: {
+                Answer: [{ name: 'example.com.', type: 1, TTL: 60, data: '93.184.216.34' }],
+              },
+            }
+          : { status: 200, body: {} },
+      ),
+    );
+
+    render(<AskPanel open onClose={vi.fn()} hostFetch={hostFetch} />);
+    await user.type(screen.getByTestId('ask-input'), 'example.com');
+    await user.click(screen.getByTestId('ask-run'));
+
+    const results = await screen.findByTestId('ask-results');
+    expect(results).toHaveTextContent('93.184.216.34');
+    expect(screen.getByRole('link', { name: 'Open source' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('dns.google'),
+    );
+    await user.click(screen.getByText('View raw result'));
+    expect(results).toHaveTextContent('93.184.216.34');
+  });
 });

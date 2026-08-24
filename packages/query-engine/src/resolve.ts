@@ -7,10 +7,24 @@
  */
 
 import type { EngineId, EntityKind, ProviderId, TransformId } from '@nexus/transforms';
-import type { Evidence, ProposedEntity, ProposedRelationship } from '@nexus/transforms';
+import type { Evidence, ProposedEntity, ProposedRelationship, RawChunk } from '@nexus/transforms';
 import { INPUT_REF } from '@nexus/transforms';
 
 import { canonicalValue, identityKey } from './normalize.ts';
+
+/**
+ * One piece of evidence, kept next to the raw thing it came from (Part 2 §18, §19). The normalized
+ * view must always be one click away from what the provider actually said, or the analyst is
+ * trusting a summary they cannot check.
+ */
+export interface EvidenceRef {
+  readonly excerpt?: string;
+  /** Original provider URL — "Open source". */
+  readonly url?: string;
+  /** Raw provider payload, verbatim — "View raw result". */
+  readonly raw?: unknown;
+  readonly observedAt: string;
+}
 
 /** Where one observation came from. Credentials never appear here (§9). */
 export interface Provenance {
@@ -25,6 +39,8 @@ export interface Provenance {
   /** Confidence as stated by this source alone, before corroboration. */
   readonly confidence: number;
   readonly evidence: readonly string[];
+  /** Same evidence, with its source URL and raw payload attached (§18, §19). */
+  readonly refs?: readonly EvidenceRef[];
 }
 
 export interface ResolvedEntity {
@@ -71,6 +87,8 @@ export interface EngineResult {
   readonly entities: readonly ProposedEntity[];
   readonly relationships: readonly ProposedRelationship[];
   readonly evidence: readonly Evidence[];
+  /** Raw provider output of the same run, so evidence can point back at it (§19). */
+  readonly chunks?: readonly RawChunk[];
 }
 
 export interface GraphBuilder {
@@ -182,10 +200,22 @@ export const createGraphBuilder = (): GraphBuilder => {
     absorb: (inputId, result, provenance) => {
       const created: ResolvedEntity[] = [];
       const evidenceFor = new Map<string, string[]>();
+      const refsFor = new Map<string, EvidenceRef[]>();
       for (const item of result.evidence) {
         const bucket = evidenceFor.get(item.entity) ?? [];
         bucket.push(item.excerpt ?? `${item.observedAt}#${String(item.chunk ?? 0)}`);
         evidenceFor.set(item.entity, bucket);
+
+        const chunk = item.chunk === undefined ? undefined : result.chunks?.[item.chunk];
+        const url = item.url ?? chunk?.url;
+        const refs = refsFor.get(item.entity) ?? [];
+        refs.push({
+          ...(item.excerpt !== undefined ? { excerpt: item.excerpt } : {}),
+          ...(url !== undefined ? { url } : {}),
+          ...(chunk !== undefined ? { raw: chunk.payload } : {}),
+          observedAt: item.observedAt,
+        });
+        refsFor.set(item.entity, refs);
       }
 
       const idByKey = new Map<string, string>([[INPUT_REF, inputId]]);
@@ -194,6 +224,7 @@ export const createGraphBuilder = (): GraphBuilder => {
           ...provenance,
           confidence: proposed.confidence,
           evidence: evidenceFor.get(proposed.key) ?? [],
+          refs: refsFor.get(proposed.key) ?? [],
         };
         const { id, created: isNew } = upsert(proposed.kind, proposed.value, source, {
           ...(proposed.label !== undefined ? { label: proposed.label } : {}),

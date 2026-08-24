@@ -77,3 +77,23 @@ gap that remains is engine coverage and the server-side egress proxy, not execut
 
 Open after this batch: heartbeat progress from inside a single long engine (needs a runner protocol
 change), cross-run queueing in `apps/worker`, circuit breaker and retries (`24` §6.1).
+
+## 6. Batch §15–§19 — one result format, one entity, one source of truth (2026-08-24)
+
+| §   | Requirement                      | Where it now lives                                                                                                                                                            | State                                                                                                              |
+| --- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| 15  | Universal result schemas         | `packages/transforms/sdk/types.ts` (Entity/Relationship/Evidence/RawChunk/EngineOutput), `query-engine/resolve.ts` (Provenance, ResolvedEntity/Relation, InvestigationResult) | ✅ code — the five schemas already existed as one shared contract; this batch added the source URL and raw pointer |
+| 16  | Entity-resolution pipeline       | `normalize.ts` (canonicalization + identityKey) → `resolve.ts` (dedup, corroboration) → `dedupe.ts` (loose matching)                                                          | ✅ code                                                                                                            |
+| 17  | No duplicate dump                | `dedupe.ts` `possibleDuplicates`, surfaced as "Possible duplicate" in `AskPanel`                                                                                              | ✅ code — flagged, never merged automatically                                                                      |
+| 18  | Evidence system                  | `EvidenceRef` on every `Provenance`: excerpt, source URL, raw payload, timestamp, plus service/provider/run already carried                                                   | ✅ code                                                                                                            |
+| 19  | Source-first ("Open / View raw") | `AskPanel` result list: `Open source` link and `View raw result`                                                                                                              | ✅ code                                                                                                            |
+
+Deliberately not built (§17 boundary): an automatic merge action. The analyst merges; the system
+only points. Auto-merging on a loose key is how two people with one nickname become one suspect.
+
+Loose matching covers what the owner's example asks for — `example.com`, `https://example.com/`
+and `www.example.com` are one hint — and nothing else: scheme, `www.`, a trailing slash and case.
+Fuzzy name matching (edit distance on people or companies) is out of scope until it can be scored.
+
+Still open after this batch: raw chunks live only for the lifetime of the run (nothing persists
+them to `packages/db`), so "View raw result" works inside the session and not on a reopened board.

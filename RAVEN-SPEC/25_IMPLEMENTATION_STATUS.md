@@ -540,3 +540,29 @@ k6 на стейджинге, полный сбор метрик и алерто
 - ❌ Не сделано: сердцебиение прогресса **внутри** одного долгого движка (нужна правка протокола
   раннера — сейчас шаг идёт 0 → 1), очередь нескольких прогонов в `apps/worker`, circuit breaker и
   ретраи (`24_UNIFIED_QUERY.md` §6.1).
+
+## Часть 2, пачка §15–§19 — единый формат, резолвинг сущностей, evidence (2026-08-24)
+
+Код: `packages/query-engine/src/dedupe.ts` (новый), `resolve.ts`, `events.ts`, `executor.ts`,
+`packages/transforms/src/sdk/types.ts` и три движка (crt.sh, DoH, RDAP),
+`apps/web/src/query/AskPanel.tsx`; карта покрытия — `28_PART2_COVERAGE.md` §6.
+
+- ✅ **§15 Единый формат**: пять схем уже были одним общим контрактом SDK
+  (`ProposedEntity`, `ProposedRelationship`, `Evidence`, `RawChunk`, `EngineOutput`) плюс
+  `Provenance` / `ResolvedEntity` / `ResolvedRelation` / `InvestigationResult` на стороне движка
+  запросов. Любой сервис — Sherlock, SpiderFoot, GitHub, краулер, ИИ — обязан вернуть именно их.
+  В этой пачке добавлены `url` у чанка и evidence: нормализованный результат больше не теряет адрес.
+- ✅ **§16 Entity resolution**: канонизация (`normalize.ts`) → identity key → тихое слияние
+  одинаковых (`resolve.ts`) → «похоже на дубликат» по ослабленному ключу (`dedupe.ts`:
+  схема, `www.`, хвостовой слэш и регистр отбрасываются, url/domain/hostname живут в одном
+  пространстве имён).
+- ✅ **§17 Никакой свалки дубликатов**: `possibleDuplicates` возвращает пары, «Ask Raven» показывает
+  «Possible duplicate: … — merge manually if you agree». Автослияния нет и не будет: по слабому
+  ключу склеивать людей — это как раз то, чем OSINT-инструменты фабрикуют обвинения.
+- ✅ **§18 Evidence**: у каждого источника теперь `EvidenceRef` — цитата, URL источника, сырой
+  payload провайдера и время наблюдения; сервис, провайдер, движок и runId были и раньше.
+- ✅ **§19 Source-first**: в списке результатов есть `Open source` (исходный URL) и
+  `View raw result` (сырой JSON провайдера).
+- ❌ Не сделано: сырые чанки живут только внутри прогона, в `packages/db` они не пишутся — поэтому
+  «View raw result» работает в текущей сессии, но не на переоткрытой доске. Нечёткое сопоставление
+  имён людей и компаний не делаем, пока его нельзя оценить численно.
