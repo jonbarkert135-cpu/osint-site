@@ -190,7 +190,9 @@ export function NodeHosts({
             hovered={hoveredId === id}
             selected={selected.has(id) && selected.size === 1}
             multiSelected={selected.has(id) && selected.size > 1}
-            dimmed={tagFilter !== null && !(store.getSnapshot(id)?.tags.includes(tagFilter) ?? false)}
+            dimmed={
+              tagFilter !== null && !(store.getSnapshot(id)?.tags.includes(tagFilter) ?? false)
+            }
             actions={{ ...actions, onBeginEdit: beginEdit }}
           />
         );
