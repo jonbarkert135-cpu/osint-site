@@ -24,6 +24,10 @@ export interface BoardStatus {
    * pulse"). `null` while no board is open.
    */
   readonly focusNode: ((nodeId: string) => void) | null;
+  /** The tag the canvas is currently filtered by (palette `#` mode, 03_UX.md §9.2), or `null`. */
+  readonly tagFilter: string | null;
+  /** Sets (or clears, with `null`) that filter. `null` while no board is open. */
+  readonly setTagFilter: ((tag: string | null) => void) | null;
 }
 
 export interface BoardStatusApi extends BoardStatus {
@@ -37,6 +41,8 @@ const EMPTY: BoardStatus = {
   searchIndex: null,
   tags: [],
   focusNode: null,
+  tagFilter: null,
+  setTagFilter: null,
 };
 
 const Context = createContext<BoardStatusApi>({ ...EMPTY, publish: () => undefined });
@@ -61,7 +67,9 @@ export function BoardStatusProvider({ children }: { children: ReactNode }) {
             merged.boardId === current.boardId &&
             merged.searchIndex === current.searchIndex &&
             merged.tags === current.tags &&
-            merged.focusNode === current.focusNode;
+            merged.focusNode === current.focusNode &&
+            merged.tagFilter === current.tagFilter &&
+            merged.setTagFilter === current.setTagFilter;
           if (unchanged) return current;
           return merged;
         });

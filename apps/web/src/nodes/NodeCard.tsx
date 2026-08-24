@@ -35,6 +35,8 @@ export interface NodeCardProps extends NodeCardActions {
    */
   hovered?: boolean;
   context?: CardContext;
+  /** Filtered out by the active `#` tag filter: still drawn, visibly de-emphasised (03_UX.md §9.2). */
+  dimmed?: boolean;
   now?: number;
   /**
    * The live editor, supplied by the binding layer while this card is being edited. The card stays
@@ -51,6 +53,7 @@ function NodeCardImpl({
   detailed = false,
   hovered = false,
   context,
+  dimmed = false,
   now,
   editorSlot,
   onOpenInspector,
@@ -76,6 +79,7 @@ function NodeCardImpl({
       data-node-type={node.type}
       data-state={editing ? 'editing' : state}
       data-hover={hovered ? 'true' : undefined}
+      data-dimmed={dimmed ? 'true' : undefined}
       data-locked={node.locked ? 'true' : undefined}
       style={{ borderInlineStartColor: `var(${def.glyph.colorToken})` }}
       aria-label={`${def.label}: ${node.title === '' ? 'Untitled' : node.title}`}

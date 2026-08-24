@@ -25,6 +25,11 @@ export interface NodeHostsProps extends NodeCardActions {
   /** Slot lookup, supplied by the canvas hook that owns the overlay. */
   slotOf: (id: string) => HTMLElement | undefined;
   selectedIds?: readonly string[];
+  /**
+   * Palette `#` mode (03_UX.md §9.2): when set, cards that do not carry this tag are dimmed rather
+   * than hidden — the analyst keeps the shape of the board while the matches stand out.
+   */
+  tagFilter?: string | null;
 }
 
 function HostedCard({
@@ -36,6 +41,7 @@ function HostedCard({
   hovered,
   selected,
   multiSelected,
+  dimmed,
   editing,
   onEndEdit,
   actions,
@@ -48,6 +54,7 @@ function HostedCard({
   hovered: boolean;
   selected: boolean;
   multiSelected: boolean;
+  dimmed: boolean;
   editing: boolean;
   onEndEdit: () => void;
   actions: NodeCardActions;
@@ -64,6 +71,7 @@ function HostedCard({
       detailed={detailed}
       hovered={hovered}
       context={{ selected, multiSelected }}
+      dimmed={dimmed}
       {...(editing
         ? {
             editorSlot: (
@@ -89,6 +97,7 @@ export function NodeHosts({
   store,
   slotOf,
   selectedIds = [],
+  tagFilter = null,
   ...actions
 }: NodeHostsProps) {
   const [ids, setIds] = useState<readonly string[]>([]);
@@ -181,6 +190,9 @@ export function NodeHosts({
             hovered={hoveredId === id}
             selected={selected.has(id) && selected.size === 1}
             multiSelected={selected.has(id) && selected.size > 1}
+            dimmed={
+              tagFilter !== null && !(store.getSnapshot(id)?.tags.includes(tagFilter) ?? false)
+            }
             actions={{ ...actions, onBeginEdit: beginEdit }}
           />
         );

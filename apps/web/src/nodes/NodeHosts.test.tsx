@@ -97,6 +97,26 @@ describe('NodeHosts', () => {
     expect(screen.queryByText('Second')).not.toBeInTheDocument();
   });
 
+  it('dims cards that do not carry the active tag filter', () => {
+    const { doc, ids, slots, store } = setup();
+    const first = ids[0] ?? '';
+    updateNode(doc, first, { tags: ['infra'] }, { origin: 'local:edit', now: T0 });
+    const { engine, emitHosts } = fakeEngine();
+    render(
+      <NodeHosts
+        engine={engine}
+        doc={doc}
+        store={store}
+        slotOf={(id) => slots.get(id)}
+        tagFilter="infra"
+      />,
+    );
+    act(() => emitHosts(ids));
+
+    expect(screen.getByTestId(`node-card-${first}`)).not.toHaveAttribute('data-dimmed');
+    expect(screen.getByTestId(`node-card-${ids[1] ?? ''}`)).toHaveAttribute('data-dimmed', 'true');
+  });
+
   it('skips ids the overlay has no slot for', () => {
     const { doc, ids, slots, store } = setup();
     const { engine, emitHosts } = fakeEngine();

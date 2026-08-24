@@ -1164,6 +1164,30 @@
     }
   }
 
+  /* Tag filter (`#` in the palette): non-matching cards stay in place, de-emphasised, so the
+     board keeps its shape and spatial memory survives the filter (03_UX.md §9.2). */
+  .nx-node-card[data-dimmed='true'] {
+    opacity: 0.24;
+    filter: saturate(0.35);
+    transition: opacity var(--nx-dur-2) var(--nx-ease-standard);
+  }
+
+  .nx-tag-filter-chip {
+    position: absolute;
+    inset-block-start: var(--nx-space-3);
+    inset-inline-start: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--nx-space-2);
+    padding: var(--nx-space-1) var(--nx-space-3);
+    border: 1px solid var(--border-default);
+    border-radius: 999px;
+    background: var(--surface-3);
+    box-shadow: var(--nx-shadow-3);
+  }
+
   /* ------------------------------------------------------------- responsive (§25)
 
      Desktop is the primary scenario; below it there are three steps, not one
