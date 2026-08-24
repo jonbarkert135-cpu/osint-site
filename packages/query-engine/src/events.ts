@@ -8,6 +8,7 @@ import type {
   TransformId,
 } from '@nexus/transforms';
 
+import type { DuplicateHint } from './dedupe.ts';
 import type { Provenance, ResolvedEntity, ResolvedRelation } from './resolve.ts';
 
 export interface StepRef {
@@ -103,4 +104,6 @@ export interface InvestigationResult {
   readonly runs: readonly RunRecord[];
   /** Every observation made, in arrival order — the audit trail behind the graph. */
   readonly provenance: readonly Provenance[];
+  /** Pairs that are probably one entity in two notations. Never merged automatically (§17). */
+  readonly duplicates: readonly DuplicateHint[];
 }

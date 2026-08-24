@@ -101,3 +101,53 @@ describe('createGraphBuilder', () => {
     expect(builder.byKind('person')).toHaveLength(2);
   });
 });
+
+describe('evidence refs (Part 2 §18, §19)', () => {
+  const seedSource = {
+    runId: 'r1',
+    transform: 'query.intake' as const,
+    engine: 'intake' as const,
+    provider: 'local-runtime' as const,
+    input: { kind: 'domain' as const, value: 'example.com' },
+    observedAt: '2026-08-24T00:00:00.000Z',
+    cached: false,
+    confidence: 1,
+    evidence: [],
+  };
+
+  it('carries the source url and the raw chunk payload onto the entity', () => {
+    const builder = createGraphBuilder();
+    const seedId = builder.seed('domain', 'example.com', seedSource);
+    builder.absorb(
+      seedId,
+      {
+        entities: [{ key: 'e1', kind: 'hostname', value: 'a.example.com', confidence: 0.8 }],
+        relationships: [],
+        evidence: [{ entity: 'e1', observedAt: 'now', excerpt: 'crt.sh row', chunk: 0 }],
+        chunks: [{ at: 'now', url: 'https://crt.sh/?q=example.com', payload: { rows: [1] } }],
+      },
+      { ...seedSource, confidence: 0.8 },
+    );
+
+    const [ref] = builder.byKind('hostname')[0]!.sources[0]!.refs ?? [];
+    expect(ref?.url).toBe('https://crt.sh/?q=example.com');
+    expect(ref?.raw).toEqual({ rows: [1] });
+    expect(ref?.excerpt).toBe('crt.sh row');
+  });
+
+  it('leaves the ref bare when the engine offered no chunk, rather than inventing a source', () => {
+    const builder = createGraphBuilder();
+    const seedId = builder.seed('domain', 'example.com', seedSource);
+    builder.absorb(
+      seedId,
+      {
+        entities: [{ key: 'e1', kind: 'hostname', value: 'b.example.com', confidence: 0.5 }],
+        relationships: [],
+        evidence: [{ entity: 'e1', observedAt: 'now' }],
+      },
+      { ...seedSource, confidence: 0.5 },
+    );
+    const [ref] = builder.byKind('hostname')[0]!.sources[0]!.refs ?? [];
+    expect(ref).toEqual({ observedAt: 'now' });
+  });
+});

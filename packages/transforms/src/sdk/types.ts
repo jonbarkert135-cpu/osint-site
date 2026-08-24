@@ -58,6 +58,8 @@ export interface EngineContext {
 export interface RawChunk {
   /** ISO timestamp of the observation. */
   readonly at: string;
+  /** Where this chunk came from, so the analyst can open the source itself (Part 2 §19). */
+  readonly url?: string;
   readonly payload: unknown;
   /**
    * `false` means "the provider may hold more than this" — the router is then allowed to try a
@@ -98,6 +100,8 @@ export interface Evidence {
   readonly excerpt?: string;
   /** Index into the raw chunk list of the run. */
   readonly chunk?: number;
+  /** Original provider URL behind this evidence; falls back to the chunk's url (Part 2 §19). */
+  readonly url?: string;
 }
 
 export interface EngineOutput {

@@ -81,6 +81,7 @@ const result = (): InvestigationResult => ({
   ],
   runs: [],
   provenance: [],
+  duplicates: [],
 });
 
 describe('toImportProposal', () => {

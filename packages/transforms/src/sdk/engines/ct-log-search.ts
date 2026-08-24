@@ -66,12 +66,13 @@ export const createCtLogSearch = (): TransformEngine => ({
     const response = await ctx.fetch(url);
     if (response.status !== 200) {
       ctx.log('warn', 'crt.sh query failed', { status: response.status });
-      yield { at: new Date().toISOString(), payload: { rows: [] }, exhaustive: false };
+      yield { at: new Date().toISOString(), url, payload: { rows: [] }, exhaustive: false };
       return;
     }
     const rows = Array.isArray(response.body) ? (response.body as readonly CrtShRow[]) : [];
     yield {
       at: new Date().toISOString(),
+      url,
       payload: { rows } satisfies Payload,
       // CT shows what was certified, never what exists: another source may still know more.
       exhaustive: false,

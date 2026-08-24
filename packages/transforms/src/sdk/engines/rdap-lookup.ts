@@ -104,7 +104,8 @@ export const createRdapLookup = (): TransformEngine => ({
   execute: async function* (input, ctx) {
     if (ctx.signal.aborted) return;
     const path = input.kind === 'domain' ? 'domain' : input.kind === 'ip' ? 'ip' : 'autnum';
-    const response = await ctx.fetch(`${ENDPOINT}/${path}/${encodeURIComponent(input.value)}`);
+    const url = `${ENDPOINT}/${path}/${encodeURIComponent(input.value)}`;
+    const response = await ctx.fetch(url);
     if (response.status === 404) {
       // A registry that says "no record" has answered: that is an exhaustive negative.
       ctx.log('info', 'no RDAP record', { input: input.value });
@@ -112,11 +113,12 @@ export const createRdapLookup = (): TransformEngine => ({
     }
     if (response.status !== 200) {
       ctx.log('warn', 'RDAP lookup failed', { status: response.status });
-      yield { at: new Date().toISOString(), payload: { record: {} }, exhaustive: false };
+      yield { at: new Date().toISOString(), url, payload: { record: {} }, exhaustive: false };
       return;
     }
     yield {
       at: new Date().toISOString(),
+      url,
       payload: { record: (response.body ?? {}) as RdapResponse } satisfies Payload,
     };
   },

@@ -42,6 +42,7 @@ import type {
 import type { QueryPlan } from './plan.ts';
 import { canonicalValue } from './normalize.ts';
 import { createGraphBuilder, type Provenance, type ResolvedEntity } from './resolve.ts';
+import { possibleDuplicates } from './dedupe.ts';
 import { buildDag, createScheduler } from './schedule.ts';
 
 export interface EngineLibrary {
@@ -201,13 +202,17 @@ export async function* executePlan(
     };
   };
 
-  const result = (): InvestigationResult => ({
-    summary: summarize(),
-    entities: builder.entities,
-    relations: builder.relations,
-    runs,
-    provenance,
-  });
+  const result = (): InvestigationResult => {
+    const entities = builder.entities;
+    return {
+      summary: summarize(),
+      entities,
+      relations: builder.relations,
+      runs,
+      provenance,
+      duplicates: possibleDuplicates(entities),
+    };
+  };
 
   if (query.chosen === undefined || query.plan === undefined || plannedSteps === 0) {
     warnings.push(
@@ -393,6 +398,7 @@ export async function* executePlan(
           entities: outcome.entities,
           relationships: outcome.relationships,
           evidence: outcome.evidence,
+          chunks: outcome.chunks,
         },
         source,
       );

@@ -80,6 +80,7 @@ export const createDohResolver = (): TransformEngine => ({
         // the result may be incomplete so the router may still try a fallback engine.
         yield {
           at: new Date().toISOString(),
+          url,
           payload: { recordType, answers: [] },
           exhaustive: false,
         };
@@ -88,6 +89,7 @@ export const createDohResolver = (): TransformEngine => ({
       const body = response.body as { readonly Answer?: readonly DohAnswer[] } | null;
       yield {
         at: new Date().toISOString(),
+        url,
         payload: { recordType, answers: body?.Answer ?? [] } satisfies DohPayload,
       };
     }

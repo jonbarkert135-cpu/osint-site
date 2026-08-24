@@ -1565,6 +1565,32 @@
     text-decoration: line-through;
   }
 
+  /* Results and duplicate hints (Part 2 §17, §19): the raw source stays one click away. */
+  .nx-ask-results,
+  .nx-ask-dupes {
+    list-style: none;
+    margin: var(--space-3, 12px) 0 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-2, 8px);
+    font-size: var(--text-body-sm, 13px);
+  }
+
+  .nx-ask-results pre {
+    max-block-size: 220px;
+    overflow: auto;
+    padding: var(--space-2, 8px);
+    border-radius: var(--nx-radius-sm, 6px);
+    background: var(--nx-surface-3, rgb(255 255 255 / 6%));
+    font-size: var(--text-body-xs, 12px);
+  }
+
+  .nx-ask-dupes li {
+    padding: var(--space-2, 8px);
+    border-radius: var(--nx-radius-sm, 6px);
+    border: 1px dashed var(--nx-warning, #f0b429);
+  }
+
   .nx-ask-plan {
     display: flex;
     flex-direction: column;
