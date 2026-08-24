@@ -104,6 +104,8 @@ export function BoardWorkspace() {
   const [counts, setCounts] = useState({ nodes: 0, edges: 0 });
   /** The board's tags, as one sorted string — a primitive an effect can depend on cheaply. */
   const [tagKey, setTagKey] = useState('');
+  /** Palette `#` mode filters the canvas to one tag; ephemeral view state, never document state. */
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<readonly string[]>([]);
   const [inspectorWidth, setInspectorWidth] = useState(360);
   const [focusTitleFor, setFocusTitleFor] = useState<string | undefined>(undefined);
@@ -280,12 +282,25 @@ export function BoardWorkspace() {
     [engine],
   );
   useEffect(() => {
-    boardStatus.publish({ boardId, searchIndex, focusNode });
+    boardStatus.publish({ boardId, searchIndex, focusNode, tagFilter, setTagFilter });
     // Leaving the board clears it, or the palette would still think one is open (its board
     // commands are gated on that) on the project and settings pages.
-    return () => boardStatus.publish({ boardId: null, searchIndex: null, focusNode: null });
+    return () =>
+      boardStatus.publish({
+        boardId: null,
+        searchIndex: null,
+        focusNode: null,
+        tagFilter: null,
+        setTagFilter: null,
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boardId, searchIndex, focusNode]);
+  }, [boardId, searchIndex, focusNode, tagFilter]);
+
+  // A tag that disappears from the board (last node untagged or deleted) must not leave the canvas
+  // filtered by something that no longer exists.
+  useEffect(() => {
+    if (tagFilter !== null && !tagKey.split('\u0000').includes(tagFilter)) setTagFilter(null);
+  }, [tagKey, tagFilter]);
 
   // Records "opened" once per mount (P7 §6: board grid's "last opened" sort).
   useEffect(() => {
@@ -689,6 +704,16 @@ export function BoardWorkspace() {
             <span>Drop to add {dropZone.state.summary}</span>
           </div>
         ) : null}
+        {tagFilter !== null && viewMode === 'canvas' ? (
+          <div className="nx-tag-filter-chip" data-testid="tag-filter-chip" role="status">
+            <span>
+              Filtered by <strong>#{tagFilter}</strong>
+            </span>
+            <Button variant="ghost" size="sm" onClick={() => setTagFilter(null)}>
+              Clear
+            </Button>
+          </div>
+        ) : null}
         {viewMode === 'canvas' ? null : (
           <Suspense fallback={null}>
             <ViewPanel
@@ -715,6 +740,7 @@ export function BoardWorkspace() {
                   store={store}
                   slotOf={slotOf}
                   selectedIds={selectedIds}
+                  tagFilter={tagFilter}
                   onOpenInspector={(id) => setSelectedIds([id])}
                   onDuplicate={(id) => {
                     duplicateNode(doc, id, { now: new Date().toISOString() });

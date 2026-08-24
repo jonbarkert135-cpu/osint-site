@@ -2,16 +2,25 @@
  * The command palette (P7 §5.8-10): fuzzy commands by default, plus four prefix modes. One input,
  * one list, arrow-key navigation and an `aria-live` result count for screen readers.
  *
- * Modes (P7 §5.9): `>` commands only (same list as no prefix), `#` tags on this board, `@` nodes
- * on this board (jumps the camera and pulses the result — the same path search results use),
- * `/` projects (and, once one is open, its boards), `?` help topics.
+ * Modes (P7 §5.9, extended in §9.2): `>` commands only (same list as no prefix), `#` tags on this
+ * board — picking one filters the canvas to it — `@` nodes on this board (jumps the camera and
+ * pulses the result), `@@` nodes across every board in the workspace (read from IndexedDB on
+ * demand; a hit navigates to that board and lands on the node), `/` projects (and, once one is
+ * open, its boards), `?` help topics.
  */
 
 import { Dialog } from '@nexus/ui';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
-import { useBoards, useProjects, useWorkspaceRole } from '../../data/workspace/context.tsx';
+import {
+  useAllBoards,
+  useBoards,
+  useProjects,
+  useWorkspaceRole,
+} from '../../data/workspace/context.tsx';
+import { useWorkspaceSearchIndex } from '../../search/useWorkspaceSearchIndex.ts';
+import { splitResultId } from '../../search/workspaceSearch.ts';
 import { useBoardStatus } from '../shell/boardStatus.tsx';
 import { registerStaticCommands } from './commands/staticCommands.ts';
 import { commandRegistry, recordRecentCommand, type CommandContext } from './registry.ts';
@@ -50,14 +59,19 @@ export function useShortcut(combo: string, handler: () => void): void {
   }, [combo, handler]);
 }
 
-type Mode = 'commands' | 'tags' | 'nodes' | 'switch' | 'help';
+type Mode = 'commands' | 'tags' | 'nodes' | 'workspaceNodes' | 'switch' | 'help';
 
-function modeOf(query: string): { mode: Mode; term: string } {
+export function modeOf(query: string): { mode: Mode; term: string } {
   const prefix = query.charAt(0);
   const term = query.slice(1);
   if (prefix === '>') return { mode: 'commands', term };
   if (prefix === '#') return { mode: 'tags', term };
-  if (prefix === '@') return { mode: 'nodes', term };
+  // `@@` searches every board in the workspace (03_UX.md §9.2); `@` stays on the open one.
+  if (prefix === '@') {
+    return query.charAt(1) === '@'
+      ? { mode: 'workspaceNodes', term: query.slice(2) }
+      : { mode: 'nodes', term };
+  }
   if (prefix === '/') return { mode: 'switch', term };
   if (prefix === '?') return { mode: 'help', term };
   return { mode: 'commands', term: query };
@@ -128,6 +142,20 @@ export function CommandPalette() {
   const projects = useProjects();
   const boards = useBoards(context.projectId ?? '');
 
+  // Workspace-wide node search (`@@`): the board list and the cross-board index are both built only
+  // once the analyst asks for them — opening every board's IndexedDB document is not free (§9.1).
+  const workspaceWanted = open && mode === 'workspaceNodes';
+  const allBoards = useAllBoards(workspaceWanted);
+  const searchableBoards = useMemo(
+    () => (allBoards.data ?? []).map((board) => ({ id: board.id, title: board.title })),
+    [allBoards.data],
+  );
+  const workspaceSearch = useWorkspaceSearchIndex({
+    active: workspaceWanted,
+    boards: searchableBoards,
+    skipBoardId: boardStatus.boardId,
+  });
+
   const rows: Row[] = useMemo(() => {
     if (!open) return [];
 
@@ -193,18 +221,51 @@ export function CommandPalette() {
 
     if (mode === 'tags') {
       const needle = term.toLowerCase();
-      return boardStatus.tags
-        .filter((tag) => tag.toLowerCase().includes(needle))
-        .map(
-          (tag): Row => ({
-            key: tag,
-            label: tag,
-            run: () => undefined, // Tag filtering on the canvas is out of this phase's scope.
-          }),
-        );
+      const setTagFilter = boardStatus.setTagFilter;
+      const clearRow: Row[] =
+        boardStatus.tagFilter !== null && setTagFilter !== null
+          ? [
+              {
+                key: 'tag:clear',
+                label: `Clear filter (#${boardStatus.tagFilter})`,
+                hint: 'filter',
+                run: () => setTagFilter(null),
+              },
+            ]
+          : [];
+      return [
+        ...clearRow,
+        ...boardStatus.tags
+          .filter((tag) => tag.toLowerCase().includes(needle))
+          .map(
+            (tag): Row => ({
+              key: tag,
+              label: tag,
+              hint: boardStatus.tagFilter === tag ? 'filtering' : 'filter board',
+              // Filtering is a view state the board owns; the palette only asks for it (N2).
+              run: () => setTagFilter?.(tag),
+            }),
+          ),
+      ];
     }
 
     if (mode === 'nodes') return nodeRows(20);
+
+    if (mode === 'workspaceNodes') {
+      const result = workspaceSearch.result;
+      const openBoardRows = nodeRows(8);
+      if (result === null || term.trim() === '') return openBoardRows;
+      const crossBoardRows = result.index.search(term, { limit: 20 }).map((hit): Row => {
+        const { boardId, nodeId } = splitResultId(hit.id);
+        return {
+          key: `w:${hit.id}`,
+          label: hit.title === '' ? '(untitled)' : hit.title,
+          hint: result.boardTitles.get(boardId) ?? 'other board',
+          run: () => void navigate(`/b/${boardId}`, { state: { focusNodeId: nodeId } }),
+        };
+      });
+      return [...openBoardRows, ...crossBoardRows];
+    }
 
     // mode === 'switch': projects, then (once one is in view) its boards. An empty term lists
     // everything, so `Ctrl+P` on its own is still a plain switcher.
@@ -228,7 +289,18 @@ export function CommandPalette() {
         ),
       ];
     return placeRows();
-  }, [open, mode, term, query, context, boardStatus, projects.data, boards.data, navigate]);
+  }, [
+    open,
+    mode,
+    term,
+    query,
+    context,
+    boardStatus,
+    projects.data,
+    boards.data,
+    workspaceSearch.result,
+    navigate,
+  ]);
 
   const choose = (row: Row | undefined) => {
     if (row === undefined) return;
@@ -267,7 +339,7 @@ export function CommandPalette() {
           ref={inputRef}
           className="nx-input"
           aria-label="Command palette"
-          placeholder="Search commands and this board — or #tag / @node / /board / ?help"
+          placeholder="Search commands and this board — or #tag / @node / @@all boards / /board / ?help"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onKeyDown}
@@ -275,6 +347,12 @@ export function CommandPalette() {
         <div aria-live="polite" className="nx-visually-hidden">
           {rows.length} {rows.length === 1 ? 'result' : 'results'}
         </div>
+        {mode === 'workspaceNodes' && workspaceSearch.phase === 'building' ? (
+          <p className="nx-muted">Searching every board…</p>
+        ) : null}
+        {mode === 'workspaceNodes' && workspaceSearch.phase === 'failed' ? (
+          <p className="nx-muted">Could not read the other boards on this device.</p>
+        ) : null}
         {rows.length === 0 ? (
           <p className="nx-muted">
             {query.trim() === '' ? 'No commands yet' : 'Nothing matches that here'}

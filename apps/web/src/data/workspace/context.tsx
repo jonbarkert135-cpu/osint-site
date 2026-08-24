@@ -187,6 +187,24 @@ export function useBoards(
   });
 }
 
+/**
+ * Every board the caller can see, across all their projects — the input to workspace-wide search
+ * (03_UX.md §9.2 `@@`). Disabled by default: it fans out one list per project, so it runs only when
+ * a surface actually asks for cross-project results.
+ */
+export function useAllBoards(enabled: boolean): UseQueryResult<WorkspaceBoard[]> {
+  const repository = useWorkspace();
+  return useQuery({
+    queryKey: ['workspace', 'boards', 'all'] as const,
+    queryFn: async () => {
+      const projects = await repository.listProjects({});
+      const lists = await Promise.all(projects.map((project) => repository.listBoards(project.id)));
+      return lists.flat();
+    },
+    enabled,
+  });
+}
+
 export function useCreateBoard(
   projectId: string,
   onCreated: (board: WorkspaceBoard) => void | Promise<void>,
