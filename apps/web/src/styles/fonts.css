@@ -1,0 +1,12 @@
+/**
+ * Self-hosted variable fonts (04_DESIGN_SYSTEM.md §5). No CDN: the default build works offline
+ * with no account and no network (N2), so every glyph ships with the app.
+ *
+ * Each family is loaded as its weight axis only (no italic file), split by unicode-range, so a
+ * Latin-only session never downloads the Cyrillic or Greek subsets.
+ *
+ * Licences: Inter Tight, Manrope and JetBrains Mono are SIL OFL 1.1. See docs/CREDITS.md.
+ */
+@import '@fontsource-variable/inter-tight/wght.css';
+@import '@fontsource-variable/manrope/wght.css';
+@import '@fontsource-variable/jetbrains-mono/wght.css';

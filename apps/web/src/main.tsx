@@ -1,5 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import './styles/fonts.css';
 import '@nexus/ui/tokens.css';
 import './styles/app.css';
 import { AppProviders } from './app/providers';
