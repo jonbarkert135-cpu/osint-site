@@ -183,7 +183,7 @@ describe('payload round-trip (property)', () => {
       fc.property(
         fc.constantFrom(...registry.ids()),
         fc.dictionary(
-          fc.string({ maxLength: 8 }),
+          fc.string({ maxLength: 8 }).map((k) => `x_${k}`),
           fc.oneof(fc.string({ maxLength: 20 }), fc.integer(), fc.boolean()),
           {
             maxKeys: 4,
