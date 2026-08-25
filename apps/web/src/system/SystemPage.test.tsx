@@ -108,4 +108,36 @@ describe('SystemPage', () => {
     expect(card).toHaveTextContent('Compatibility');
     expect(card).toHaveTextContent(/v\d+\.\d+\.\d+/);
   });
+
+  it('renders the compatibility matrix split into the four deployment classes (§34)', async () => {
+    const user = userEvent.setup();
+    render(<SystemPage />);
+    await user.click(screen.getByRole('tab', { name: 'Runtime' }));
+
+    const panel = screen.getByTestId('system-compat');
+    expect(panel).toBeInTheDocument();
+    for (const kind of ['native', 'containerized', 'external', 'unsupported']) {
+      expect(screen.getByTestId(`compat-${kind}`)).toBeInTheDocument();
+    }
+  });
+
+  it('shows sherlock as a containerized python engine with its footprint', async () => {
+    const user = userEvent.setup();
+    render(<SystemPage />);
+    await user.click(screen.getByRole('tab', { name: 'Runtime' }));
+
+    const row = screen.getByTestId('compat-row-sherlock');
+    expect(row).toHaveTextContent('python');
+    expect(row).toHaveTextContent('512 MB');
+  });
+
+  it('says None for a deployment class with no engines rather than hiding it (§35)', async () => {
+    const user = userEvent.setup();
+    render(<SystemPage />);
+    await user.click(screen.getByRole('tab', { name: 'Runtime' }));
+
+    // No engine in the shipped catalogue is external or unsupported today; the class still shows,
+    // so the reader can see the answer is "none" rather than "not measured".
+    expect(screen.getByTestId('compat-unsupported')).toHaveTextContent('None.');
+  });
 });

@@ -83,6 +83,69 @@ export const PERMISSIONS = [
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
+/**
+ * Execution runtimes an adapter can host (Part 2 §38). The core never branches on these — only
+ * the adapter layer does (§37). Listing a runtime here is an architectural commitment, not a
+ * promise that an adapter for it is implemented today; see `ADAPTER_SUPPORT` in runtime.ts.
+ */
+export const ENGINE_RUNTIMES = [
+  'node',
+  'python',
+  'go',
+  'rust',
+  'cli',
+  'http',
+  'external-api',
+  'browser-worker',
+] as const;
+export type EngineRuntime = (typeof ENGINE_RUNTIMES)[number];
+
+/**
+ * How an engine reaches the host (Part 2 §34).
+ * - `native`        runs in-process or as a plain child process on the VPS
+ * - `containerized` requires a container image with explicit limits
+ * - `external`      runs off-box, reached through the remote execution queue (§36)
+ * - `unsupported`   impossible or not worth it on this host; needs a strategy (§35)
+ */
+export const DEPLOYMENT_KINDS = ['native', 'containerized', 'external', 'unsupported'] as const;
+export type DeploymentKind = (typeof DEPLOYMENT_KINDS)[number];
+
+/** What to do instead of bending the architecture around an ill-fitting project (Part 2 §35). */
+export const FALLBACK_STRATEGIES = [
+  'native-adapter',
+  'external-worker',
+  'remote-execution',
+  'optional-integration',
+  'replacement',
+] as const;
+export type FallbackStrategy = (typeof FALLBACK_STRATEGIES)[number];
+
+export interface EngineRequirements {
+  /** Container image, only meaningful for `containerized`. */
+  readonly image?: string;
+  readonly memoryMb: number;
+  readonly cpu: number;
+  /** True when the engine needs a writable path that outlives one run. */
+  readonly persistent: boolean;
+}
+
+export interface EngineFallback {
+  readonly strategy: FallbackStrategy;
+  /** Engine id, worker name or integration to use instead. */
+  readonly target?: string;
+  readonly note?: string;
+}
+
+/** The runtime passport of an engine (Part 2 §34, §39). */
+export interface EngineRuntimeSpec {
+  readonly runtime: EngineRuntime;
+  readonly deployment: DeploymentKind;
+  readonly requirements: EngineRequirements;
+  /** Whether it can run on the host profile in RAVEN-SPEC/29 §7. */
+  readonly hostCompatible: boolean;
+  readonly fallback?: EngineFallback;
+}
+
 /** A–F, see docs/ecosystem/PROVIDER_CATALOG.md. */
 export const CREDENTIAL_CLASSES = ['A', 'B', 'C', 'D', 'E', 'F'] as const;
 export type CredentialClass = (typeof CREDENTIAL_CLASSES)[number];
@@ -162,6 +225,8 @@ export interface EngineManifest {
   readonly cost: ExecutionClass;
   /** A terminal engine ends a fallback chain without executing anything: a link out, or manual entry. */
   readonly terminal: boolean;
+  /** Runtime passport (Part 2 §34/§39). Derived by `resolveRuntime()` when a manifest omits it. */
+  readonly runtime?: EngineRuntimeSpec;
   readonly status: ManifestStatus;
 }
 

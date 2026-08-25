@@ -191,3 +191,19 @@ systemd, persistent disk, nginx + Let's Encrypt) rather than a PaaS. Containeriz
 therefore allowed with explicit per-container limits. What remains unverified is machine capacity —
 RAM, cores, disk, Docker version — which `scripts/survey-host.sh` answers when run on the host; the
 resource budget keeps its conservative defaults until that output is recorded.
+
+## Batch: §34–§39 (2026-08-25)
+
+| §   | Point                 | Where                                                            | State                    |
+| --- | --------------------- | ---------------------------------------------------------------- | ------------------------ |
+| 34  | Compatibility matrix  | `packages/transforms/src/runtime.ts`, `/system` → Runtime        | ✅ 4 classes, per-engine |
+| 35  | No forced fits        | `FALLBACK_STRATEGIES` on the passport, surfaced as "Alternative" | ✅ data, not folklore    |
+| 36  | Remote engine queue   | `packages/transforms/src/remote.ts`                              | ⚠️ queue only, no worker |
+| 37  | Engine abstraction    | `packages/transforms/src/adapters.ts` (`EngineAdapter`)          | ✅ core is runtime-blind |
+| 38  | Multi-runtime support | `ENGINE_RUNTIMES` + `ADAPTER_SUPPORT`                            | ⚠️ 3 of 8 implemented    |
+| 39  | Engine manifest       | `EngineRuntimeSchema`, `resolveRuntime()`                        | ✅ validated, derivable  |
+
+Design and gaps: `30_ENGINE_RUNTIME_ARCHITECTURE.md`. Two honest limits: the cli/python adapters do
+not exist yet, so the three containerized engines (amass, sherlock, subfinder) are classified and
+limited but not runnable; and no external worker ships with the repo, so §36 is exercised by tests
+rather than in production.
