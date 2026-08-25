@@ -185,7 +185,7 @@ environment, and demands a survey of what the Hidden Cloud actually supports bef
 engine. **That survey has not been done** — `19_DEPLOYMENT.md` currently specifies full
 k8s + gVisor self-hosting, which is the _target_, not a verified Hidden Cloud environment.
 
-Until the survey exists (`27_HIDDEN_CLOUD_ARCHITECTURE.md`, next document in the Part 2 sequence),
+Until the survey exists (checklist now open in `29_RUNTIME_ENVIRONMENT.md` §7.1),
 every passport's Hidden Cloud field stays **unverified**, and the working assumption for new
 engines is the most restrictive one: prefer `http` and `builtin` execution kinds; treat
 containerized engines (Sherlock today) as requiring a confirmed container runtime.

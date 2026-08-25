@@ -7,3 +7,5 @@ export * from './assurance.ts';
 export * from './events.ts';
 export * from './schedule.ts';
 export * from './executor.ts';
+export * from './health.ts';
+export * from './resources.ts';

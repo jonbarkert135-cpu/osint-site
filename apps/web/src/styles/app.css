@@ -1927,3 +1927,155 @@
   flex-wrap: wrap;
   gap: var(--nx-space-2);
 }
+
+/* System health + engine registry (Part 2 §27, §28). */
+.nx-topbar-link {
+  color: var(--fg-secondary);
+  font: var(--text-label);
+  text-decoration: none;
+  padding: var(--nx-space-1) var(--nx-space-2);
+  border-radius: var(--nx-radius-2);
+}
+
+.nx-topbar-link:hover,
+.nx-topbar-link.active {
+  color: var(--fg-primary);
+  background: var(--surface-2);
+}
+
+.nx-system {
+  padding: var(--nx-space-4);
+}
+
+.nx-system-head {
+  display: flex;
+  align-items: center;
+  gap: var(--nx-space-3);
+}
+
+.nx-tabs {
+  display: flex;
+  gap: var(--nx-space-1);
+  margin-left: auto;
+}
+
+.nx-tab {
+  font: var(--text-label);
+  color: var(--fg-secondary);
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--nx-radius-2);
+  padding: var(--nx-space-1) var(--nx-space-3);
+  cursor: pointer;
+}
+
+.nx-tab[aria-selected='true'] {
+  color: var(--fg-primary);
+  background: var(--surface-2);
+  border-color: var(--border-accent);
+}
+
+.nx-system-note {
+  font: var(--text-body-sm);
+  color: var(--fg-muted);
+}
+
+.nx-table-caption {
+  font: var(--text-body-sm);
+  color: var(--fg-muted);
+  text-align: left;
+  padding-bottom: var(--nx-space-2);
+}
+
+.nx-sr-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.nx-health-name {
+  display: flex;
+  align-items: center;
+  gap: var(--nx-space-2);
+  font: var(--text-body);
+}
+
+.nx-health-actions {
+  text-align: right;
+}
+
+.nx-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--nx-radius-full);
+  display: inline-block;
+  background: var(--fg-muted);
+}
+
+.nx-dot-online {
+  background: var(--status-success-fg);
+}
+
+.nx-dot-degraded {
+  background: var(--status-warn-fg);
+}
+
+.nx-dot-offline {
+  background: var(--status-danger-fg);
+}
+
+.nx-dot-disabled,
+.nx-dot-ignored,
+.nx-dot-unknown {
+  background: var(--fg-muted);
+  opacity: 0.6;
+}
+
+.nx-engine-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--nx-space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.nx-engine-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--nx-radius-3);
+  background: var(--surface-1);
+  padding: var(--nx-space-3);
+}
+
+.nx-engine-head {
+  display: flex;
+  align-items: center;
+  gap: var(--nx-space-2);
+  margin-bottom: var(--nx-space-2);
+}
+
+.nx-engine-version {
+  font: var(--text-mono);
+  color: var(--fg-muted);
+  margin-left: auto;
+}
+
+.nx-engine-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--nx-space-1) var(--nx-space-3);
+  margin: 0;
+  font: var(--text-body-sm);
+}
+
+.nx-engine-facts dt {
+  color: var(--fg-muted);
+}
+
+.nx-engine-facts dd {
+  margin: 0;
+  color: var(--fg-secondary);
+}
