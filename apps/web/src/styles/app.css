@@ -1591,6 +1591,132 @@
     border: 1px dashed var(--nx-warning, #f0b429);
   }
 
+  /* Run dashboard (Part 2 §20–§23): one design system for every service's findings. */
+  .nx-dashboard {
+    display: grid;
+    gap: var(--nx-space-4);
+    margin-block-start: var(--nx-space-5);
+  }
+
+  .nx-dashboard-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--nx-space-3);
+  }
+
+  .nx-dashboard-counters {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: var(--nx-space-3);
+  }
+
+  .nx-dashboard-counters li {
+    display: grid;
+    gap: var(--nx-space-1);
+    padding: var(--nx-space-3);
+    border-radius: var(--nx-radius-3);
+    background: var(--surface-2);
+  }
+
+  .nx-dashboard-value {
+    font: var(--text-title);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .nx-service-panel {
+    display: grid;
+    gap: var(--nx-space-3);
+    padding: var(--nx-space-4);
+    border-radius: var(--nx-radius-4);
+    border: 1px solid var(--border-subtle);
+  }
+
+  .nx-service-panel[data-state='failed'] {
+    border-color: var(--border-danger);
+  }
+
+  .nx-service-panel > header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--nx-space-3);
+  }
+
+  .nx-result-cards {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--nx-space-3);
+  }
+
+  .nx-result-card {
+    display: grid;
+    gap: var(--nx-space-2);
+    padding: var(--nx-space-3);
+    border-radius: var(--nx-radius-3);
+    background: var(--surface-2);
+  }
+
+  .nx-result-card[data-evidence='true'] {
+    box-shadow: inset 2px 0 0 var(--border-accent);
+  }
+
+  .nx-result-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--nx-space-3);
+  }
+
+  .nx-result-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--nx-space-3);
+  }
+
+  .nx-result-actions button,
+  .nx-result-actions a {
+    background: none;
+    border: 0;
+    padding: 0;
+    font: var(--text-label);
+    color: var(--fg-muted);
+    cursor: pointer;
+    text-decoration: underline;
+  }
+
+  .nx-result-actions button:hover,
+  .nx-result-actions a:hover,
+  .nx-result-actions button[aria-pressed='true'] {
+    color: var(--fg-primary);
+  }
+
+  .nx-result-detail pre {
+    max-block-size: 220px;
+    overflow: auto;
+    padding: var(--nx-space-3);
+    border-radius: var(--nx-radius-3);
+    background: var(--surface-3);
+    font: var(--text-mono);
+  }
+
+  .nx-dashboard-block {
+    font: var(--text-body-sm);
+  }
+
+  .nx-dashboard-block ul,
+  .nx-dashboard-block ol {
+    margin: var(--nx-space-3) 0 0;
+    padding-inline-start: var(--nx-space-5);
+    display: grid;
+    gap: var(--nx-space-1);
+  }
+
   .nx-ask-plan {
     display: flex;
     flex-direction: column;
