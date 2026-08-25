@@ -18,6 +18,7 @@ const SignupPage = lazy(() => import('./auth/SignupPage'));
 const ProjectPage = lazy(() => import('./pages/ProjectPage'));
 const BoardPage = lazy(() => import('./pages/BoardPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const SystemPage = lazy(() => import('../system/SystemPage'));
 
 /**
  * Shown while a route chunk loads. It is a real landmark with a heading on purpose: the axe sweep
@@ -141,6 +142,16 @@ export function AppRoutes() {
               <RequireAuth>
                 <ShellContainer>
                   <SettingsPage />
+                </ShellContainer>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/system"
+            element={
+              <RequireAuth>
+                <ShellContainer>
+                  <SystemPage />
                 </ShellContainer>
               </RequireAuth>
             }

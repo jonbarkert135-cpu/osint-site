@@ -25,6 +25,7 @@ import {
 } from '@nexus/transforms';
 import { useCallback, useMemo, useRef, useState } from 'react';
 
+import { recordRuns } from '../system/runtimeStore.ts';
 import { createBrowserHostFetch } from './hostFetch.ts';
 
 export type RunPhase = 'idle' | 'running' | 'done' | 'failed';
@@ -280,6 +281,8 @@ export function useQueryRun(options: UseQueryRunOptions = {}): QueryRunControlle
           const step = await stream.next();
           if (step.done === true) {
             const result = step.value;
+            // Health on the System page is derived from what actually ran (Part 2 §27).
+            recordRuns(result.runs);
             setState((current) => ({
               ...current,
               phase: 'done',

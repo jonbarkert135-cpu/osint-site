@@ -231,6 +231,9 @@ export function Shell({
         </Menu>
         <h1 className="nx-topbar-title">{boardTitle}</h1>
         <div className="nx-topbar-spacer" />
+        <NavLink className="nx-topbar-link" to="/system">
+          System
+        </NavLink>
         <Menu trigger={<Button variant="ghost">{userName}</Button>} align="end">
           <MenuItem>Settings</MenuItem>
           {authEnabled ? <MenuItem>Sign out</MenuItem> : null}
