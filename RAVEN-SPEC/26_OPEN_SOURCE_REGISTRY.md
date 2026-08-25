@@ -178,17 +178,21 @@ Scraping-based engines (Sherlock, Maigret) decay silently as sites change. A sch
 diff upstream site definitions and alert on drift (audit §7 item 7). **Not built yet** — tracked in
 roadmap §2 (Sherlock watchlist/diff).
 
-## 4. Hidden Cloud compatibility (Part 2 §33 — open)
+## 4. Hidden Cloud compatibility (Part 2 §33 — resolved 2026-08-25)
 
-Part 2 §33 forbids assuming Docker, root, daemons or arbitrary binaries on the deployment
-environment, and demands a survey of what the Hidden Cloud actually supports before adopting any
-engine. **That survey has not been done** — `19_DEPLOYMENT.md` currently specifies full
-k8s + gVisor self-hosting, which is the _target_, not a verified Hidden Cloud environment.
+"Hidden Cloud" is a self-managed Linux VPS (Ubuntu LTS, x86_64, root, Docker Engine, systemd,
+persistent disk, nginx in front). Full profile and the still-unmeasured capacity lines:
+`29_RUNTIME_ENVIRONMENT.md` §7.
 
-Until the survey exists (checklist now open in `29_RUNTIME_ENVIRONMENT.md` §7.1),
-every passport's Hidden Cloud field stays **unverified**, and the working assumption for new
-engines is the most restrictive one: prefer `http` and `builtin` execution kinds; treat
-containerized engines (Sherlock today) as requiring a confirmed container runtime.
+For engine selection this means:
+
+- Containerized engines (Sherlock, SpiderFoot) are **allowed**, run with explicit `--memory`,
+  `--cpus`, `--pids-limit` and a read-only rootfs, sized by the resource manager's budget.
+- `http` / `builtin` kinds remain preferred where an upstream API exists — cheaper and auditable.
+- Kubernetes, GPU and custom kernel modules stay out of scope; `19_DEPLOYMENT.md`'s k8s + gVisor
+  topology is a future target, not the current host.
+- Host capacity (RAM, cores, disk) is still unmeasured: run `scripts/survey-host.sh` on the box
+  before raising any budget.
 
 ---
 
