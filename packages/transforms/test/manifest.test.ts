@@ -117,3 +117,42 @@ describe('provider manifest', () => {
     expect(() => parseProviderManifest({ ...provider, endpoint: 'dns.google' })).toThrow();
   });
 });
+
+describe('engine runtime passport (Part 2 §39)', () => {
+  const runtime = {
+    runtime: 'python',
+    deployment: 'containerized',
+    requirements: { image: 'sherlock/sherlock:latest', memoryMb: 512, cpu: 1, persistent: false },
+    hostCompatible: true,
+  };
+
+  it('accepts a complete passport', () => {
+    expect(parseEngineManifest({ ...engine, runtime }).runtime?.runtime).toBe('python');
+  });
+
+  it('is optional, so existing manifests keep parsing', () => {
+    expect(parseEngineManifest(engine).runtime).toBeUndefined();
+  });
+
+  it('rejects a containerized engine with no image', () => {
+    const { image: _image, ...requirements } = runtime.requirements;
+    expect(() => parseEngineManifest({ ...engine, runtime: { ...runtime, requirements } })).toThrow(
+      /image/,
+    );
+  });
+
+  it('rejects an unsupported engine with no fallback strategy', () => {
+    expect(() =>
+      parseEngineManifest({
+        ...engine,
+        runtime: { ...runtime, deployment: 'unsupported', hostCompatible: false },
+      }),
+    ).toThrow(/fallback/);
+  });
+
+  it('rejects an unknown runtime', () => {
+    expect(() =>
+      parseEngineManifest({ ...engine, runtime: { ...runtime, runtime: 'cobol' } }),
+    ).toThrow();
+  });
+});

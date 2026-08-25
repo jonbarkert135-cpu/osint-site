@@ -2079,3 +2079,25 @@
   margin: 0;
   color: var(--fg-secondary);
 }
+
+/* Runtime compatibility matrix (Part 2 §34) */
+.nx-compat {
+  gap: var(--nx-space-4);
+}
+
+.nx-compat-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--nx-space-2);
+  font: var(--text-title);
+  color: var(--fg-primary);
+}
+
+.nx-compat-count {
+  padding: 0 var(--nx-space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--nx-radius-full);
+  background: var(--surface-2);
+  font: var(--text-label);
+  color: var(--fg-secondary);
+}

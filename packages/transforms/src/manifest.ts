@@ -5,8 +5,11 @@ import { z } from 'zod';
 import {
   CREDENTIAL_CLASSES,
   DATA_FLOWS,
+  DEPLOYMENT_KINDS,
+  ENGINE_RUNTIMES,
   ENTITY_KINDS,
   EXECUTION_CLASSES,
+  FALLBACK_STRATEGIES,
   MANIFEST_STATUSES,
   PERMISSIONS,
   PROVIDER_STATUSES,
@@ -54,6 +57,41 @@ export const TransformManifestSchema = z
     path: ['cacheTtlSeconds'],
   });
 
+/** Runtime passport (Part 2 §39). Optional: `resolveRuntime()` derives one when absent. */
+export const EngineRuntimeSchema = z
+  .object({
+    runtime: z.enum(ENGINE_RUNTIMES),
+    deployment: z.enum(DEPLOYMENT_KINDS),
+    requirements: z
+      .object({
+        image: z.string().min(1).optional(),
+        memoryMb: positive,
+        cpu: z.number().positive(),
+        persistent: z.boolean(),
+      })
+      .strict(),
+    hostCompatible: z.boolean(),
+    fallback: z
+      .object({
+        strategy: z.enum(FALLBACK_STRATEGIES),
+        target: z.string().min(1).optional(),
+        note: z.string().min(1).optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  // A container without an image is a wish, not a deployment.
+  .refine((r) => r.deployment !== 'containerized' || r.requirements.image !== undefined, {
+    message: 'containerized engines must declare requirements.image',
+    path: ['requirements', 'image'],
+  })
+  // §35: something that cannot run here must say what replaces it.
+  .refine((r) => r.deployment !== 'unsupported' || r.fallback !== undefined, {
+    message: 'unsupported engines must declare a fallback strategy',
+    path: ['fallback'],
+  });
+
 export const EngineManifestSchema = z
   .object({
     id,
@@ -71,6 +109,7 @@ export const EngineManifestSchema = z
     cost: z.enum(EXECUTION_CLASSES),
     terminal: z.boolean(),
     status: z.enum(MANIFEST_STATUSES),
+    runtime: EngineRuntimeSchema.optional(),
   })
   .strict()
   .refine((e) => e.dataFlow === 'local' || e.permissions.includes('network'), {

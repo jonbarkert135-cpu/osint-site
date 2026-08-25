@@ -7,5 +7,8 @@ export * from './router.ts';
 export * from './planner.ts';
 export * from './history.ts';
 export * from './cache.ts';
+export * from './runtime.ts';
+export * from './adapters.ts';
+export * from './remote.ts';
 export { createCatalogRegistry } from './catalog/index.ts';
 export * from './sdk/index.ts';

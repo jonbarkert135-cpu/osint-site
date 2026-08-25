@@ -17,7 +17,12 @@ import {
   type EngineHealth,
 } from '@nexus/query-engine';
 import {
+  compatibilityMatrix,
   createCatalogRegistry,
+  DEPLOYMENT_LABEL,
+  resolveRuntime,
+  type CompatibilityRow,
+  type DeploymentKind,
   type EngineManifest,
   type TransformRegistry,
 } from '@nexus/transforms';
@@ -62,12 +67,71 @@ const kindsOf = (
 };
 
 /** What the engine needs from the host — the field §33 says we may not assume is available. */
+/** Compatibility text comes from the engine's runtime passport, never from a second guess (§34). */
 const compatibilityOf = (engine: EngineManifest): string => {
-  if (engine.permissions.includes('subprocess')) return 'needs a subprocess host';
-  if (engine.permissions.includes('browser')) return 'needs a browser runtime';
-  if (engine.dataFlow === 'local') return 'runs in-process';
-  return 'network only';
+  const spec = resolveRuntime(engine);
+  return `${DEPLOYMENT_LABEL[spec.deployment]} · ${spec.runtime}`;
 };
+
+const DEPLOYMENT_NOTE: Readonly<Record<DeploymentKind, string>> = {
+  native: 'Runs directly on the host.',
+  containerized: 'Runs only inside a container, with explicit memory, cpu and pid limits.',
+  external:
+    'Runs off-box through the remote execution queue; falls back to local when no worker answers.',
+  unsupported: 'Not viable on this host. The alternative column says what replaces it.',
+};
+
+function CompatibilityTable({
+  kind,
+  rows,
+}: {
+  kind: DeploymentKind;
+  rows: readonly CompatibilityRow[];
+}) {
+  return (
+    <section className="nx-stack" data-testid={`compat-${kind}`}>
+      <h3 className="nx-compat-heading">
+        {DEPLOYMENT_LABEL[kind]} <span className="nx-compat-count">{rows.length}</span>
+      </h3>
+      <p className="nx-system-note">{DEPLOYMENT_NOTE[kind]}</p>
+      {rows.length === 0 ? (
+        <p className="nx-system-note">None.</p>
+      ) : (
+        <table className="nx-table">
+          <thead>
+            <tr>
+              <th scope="col">Engine</th>
+              <th scope="col">Runtime</th>
+              <th scope="col">Docker</th>
+              <th scope="col">RAM</th>
+              <th scope="col">CPU</th>
+              <th scope="col">Persistent</th>
+              <th scope="col">Host compatible</th>
+              <th scope="col">Alternative</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.engine} data-testid={`compat-row-${row.engine}`}>
+                <th scope="row">{row.engine}</th>
+                <td>
+                  {row.runtime}
+                  {row.adapter === 'planned' ? ' (adapter planned)' : ''}
+                </td>
+                <td>{row.docker ? 'yes' : 'no'}</td>
+                <td>{String(row.memoryMb)} MB</td>
+                <td>{String(row.cpu)}</td>
+                <td>{row.persistent ? 'yes' : 'no'}</td>
+                <td>{row.hostCompatible ? 'yes' : 'no'}</td>
+                <td>{row.alternative ?? '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+  );
+}
 
 function HealthRow({
   health,
@@ -118,7 +182,7 @@ function HealthRow({
 export default function SystemPage() {
   const registry = useMemo(() => createCatalogRegistry(), []);
   const runtime = useRuntime();
-  const [tab, setTab] = useState<'health' | 'engines'>('health');
+  const [tab, setTab] = useState<'health' | 'engines' | 'runtime'>('health');
 
   const engines = useMemo(
     () => [...registry.engines].sort((a, b) => a.id.localeCompare(b.id)),
@@ -134,6 +198,8 @@ export default function SystemPage() {
       ),
     [engines, runtime],
   );
+
+  const matrix = useMemo(() => compatibilityMatrix(engines), [engines]);
 
   const last = runtime.retries[0];
 
@@ -164,6 +230,17 @@ export default function SystemPage() {
           >
             Engines
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'runtime'}
+            className="nx-tab"
+            onClick={() => {
+              setTab('runtime');
+            }}
+          >
+            Runtime
+          </button>
         </div>
       </header>
 
@@ -174,7 +251,17 @@ export default function SystemPage() {
         </p>
       ) : null}
 
-      {tab === 'health' ? (
+      {tab === 'runtime' ? (
+        <div className="nx-stack nx-compat" data-testid="system-compat">
+          <p className="nx-system-note">
+            Host profile: self-managed Linux VPS with Docker (RAVEN-SPEC/29 §7). Engines that do not
+            fit are not forced in — they get a stated alternative instead.
+          </p>
+          {(['native', 'containerized', 'external', 'unsupported'] as const).map((kind) => (
+            <CompatibilityTable key={kind} kind={kind} rows={matrix[kind]} />
+          ))}
+        </div>
+      ) : tab === 'health' ? (
         <>
           <table className="nx-table" data-testid="system-health">
             <caption className="nx-table-caption">
