@@ -21,7 +21,7 @@ const source = (provider: string, over: Partial<Provenance> = {}): Provenance =>
 });
 
 const entity = (id: string, sources: readonly Provenance[], confidence: number): ResolvedEntity =>
-  ({ id, kind: 'hostname', value: id, props: {}, confidence, sources, seed: false }) as ResolvedEntity;
+  ({ id, kind: 'hostname', value: id, props: {}, confidence, sources, seed: false });
 
 const observed = entity(
   'a.example.com',
