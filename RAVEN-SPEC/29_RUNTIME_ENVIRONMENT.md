@@ -69,46 +69,65 @@ time. A single engine may take at most **60 %** of any dimension (fair share), s
 cannot starve the others. Refusals are typed (`cpu|memory|disk|processes|concurrency|engine-concurrency|network|execution-time`)
 and surfaced as a reason, never as a silent hang.
 
-## 7. Hidden Cloud (§33) — **unverified, and treated as hostile**
+## 7. Hidden Cloud (§33) — resolved: a self-managed Linux VPS
 
-**Status: the survey has NOT been done.** "Hidden Cloud" is not a vendor whose documentation this
-project has read, and no capability below has been confirmed. Until each line is answered with a
-citation and a date, the working assumption is the most restrictive one:
+**Decision (owner, 2026-08-25):** "Hidden Cloud" is **not** a PaaS. It is an ordinary self-managed
+Linux VPS from a mainstream provider — the same class of box most self-hosted sites run on: a full
+VM with root, a normal kernel, and no platform sandbox above it.
 
-> No Docker. No Kubernetes. No root. No privileged containers. No systemd. No arbitrary binaries.
-> No GPU. No background daemons. No custom kernel modules. No unrestricted subprocesses.
+That answers §33's question, and it flips the assumption from "assume nothing" to "assume a plain
+VM, and verify the numbers on the actual box before sizing anything." The rule §33 exists to
+enforce still holds in a narrower form: **capacity is unverified until measured** (§7.2), and no
+technology choice may depend on a managed-platform feature the VM does not have (no autoscaling,
+no managed queue, no ephemeral-filesystem semantics, no provider secret store).
 
-Consequence, already binding on `26` §4: prefer `http` and `builtin` execution kinds; any engine
-needing a container (Sherlock today) is **blocked** until a container runtime is confirmed.
+### 7.1 Baseline profile
 
-### 7.1 Survey checklist — every line `unverified` until sourced
+| Capability              | Answer                                                              | Basis                      |
+| ----------------------- | ------------------------------------------------------------------- | -------------------------- |
+| operating system        | Ubuntu LTS (22.04 / 24.04), Debian-family userland                  | owner decision, 2026-08-25 |
+| CPU architecture        | x86_64 (arm64 builds must stay possible — no x86-only binaries)     | owner decision, 2026-08-25 |
+| RAM                     | VM-sized, **measure before sizing**                                 | unmeasured — §7.2          |
+| storage                 | persistent block disk mounted on `/`; survives restart and redeploy | VM semantics               |
+| networking (egress)     | unrestricted outbound                                               | VM semantics               |
+| open ports              | full control; expose 80/443 only, everything else behind the proxy  | owner decision             |
+| process model           | full multi-process, `fork`/`exec` allowed                           | VM semantics               |
+| Docker support          | **yes** — Docker Engine + Compose                                   | owner decision, 2026-08-25 |
+| other container runtime | Podman available if wanted; Kubernetes explicitly **not** used      | owner decision             |
+| language runtimes       | Node 22 (pinned), plus whatever is installed in images              | repo toolchain             |
+| background workers      | yes — `apps/worker`, `apps/runner` as long-lived services           | VM semantics               |
+| cron                    | yes — systemd timers preferred over crontab (logging, dependencies) | owner decision             |
+| WebSockets              | yes — proxied, `proxy_read_timeout` raised for long runs            | owner decision             |
+| long-running processes  | yes — no platform request timeout                                   | VM semantics               |
+| filesystem persistence  | yes — durable; local-first (N2) can hold real state on disk         | VM semantics               |
+| environment variables   | yes — via systemd unit `EnvironmentFile=` / Compose `env_file`      | owner decision             |
+| secrets storage         | root-owned `0600` env files on disk; **no provider secret manager** | owner decision             |
+| reverse proxy           | nginx (or Caddy) terminating TLS, Let's Encrypt                     | owner decision             |
+| deployment mechanism    | build image in CI → pull on host → `docker compose up -d`           | owner decision             |
+| build pipeline          | GitHub Actions (already green: build, docker (api), docker (web))   | repo CI                    |
+| process manager         | systemd for host units; Docker restart policies for containers      | owner decision             |
 
-| Capability              | Answer     | Source / date |
-| ----------------------- | ---------- | ------------- |
-| operating system        | unverified | —             |
-| CPU architecture        | unverified | —             |
-| RAM                     | unverified | —             |
-| storage                 | unverified | —             |
-| networking (egress)     | unverified | —             |
-| open ports              | unverified | —             |
-| process model           | unverified | —             |
-| Docker support          | unverified | —             |
-| other container runtime | unverified | —             |
-| language runtimes       | unverified | —             |
-| background workers      | unverified | —             |
-| cron                    | unverified | —             |
-| WebSockets              | unverified | —             |
-| long-running processes  | unverified | —             |
-| filesystem persistence  | unverified | —             |
-| environment variables   | unverified | —             |
-| secrets storage         | unverified | —             |
-| reverse proxy           | unverified | —             |
-| deployment mechanism    | unverified | —             |
-| build pipeline          | unverified | —             |
-| process manager         | unverified | —             |
+### 7.2 What is still unverified — and how it gets verified
 
-Filling this table needs one fact from the owner: **which provider "Hidden Cloud" actually is.**
-Guessing it would be the exact failure §33 was written to prevent.
+Capacity and the exact OS build are properties of a specific machine, not of "a VPS". They are
+filled by running `scripts/survey-host.sh` **on the host** and pasting its output here with a date.
+Until then, sizing in `packages/query-engine/src/resources.ts` keeps its conservative defaults
+(2 cores / 1 GB / 2 GB disk) rather than inventing a bigger budget.
+
+Open lines: RAM, core count, disk size, kernel version, Docker version, arch confirmation.
+
+### 7.3 Consequences for engine selection
+
+Supersedes the restriction in `26` §4:
+
+- Containerized engines (Sherlock, SpiderFoot) are **unblocked** — they run as containers with
+  explicit `--memory`, `--cpus`, `--pids-limit` and a read-only rootfs, sized by §6's budget.
+- `http` and `builtin` kinds stay preferred where an API exists: cheaper, faster, easier to audit.
+- Root is available but is **not** a licence to skip limits. One tenant, one box: the resource
+  manager (§6) is the only thing standing between a heavy engine and the whole server, and §32
+  applies exactly as written.
+- No Kubernetes, no GPU, no custom kernel modules — those remain out of scope by choice, not by
+  ignorance.
 
 ## 8. Gaps
 
@@ -116,4 +135,6 @@ Guessing it would be the exact failure §33 was written to prevent.
 2. Limits are enforced at the boundary (`acquire`) — there is no in-process kill switch for an
    engine that ignores its own timeout; that needs the runner, not the browser.
 3. Heartbeat progress for long engines is not emitted, so `queue` is coarse.
-4. The §33 table above is empty on purpose.
+4. §7.2 — host capacity (RAM, cores, disk, Docker version) is unmeasured; run
+   `scripts/survey-host.sh` on the box and record the output with a date before raising the
+   resource budget.

@@ -175,16 +175,19 @@ make the number unfalsifiable. Marking a finding as evidence (§22) is the hones
 
 ## Batch: §27–§33 (2026-08-25)
 
-| §   | Requirement           | Where it now lives                                                  | State                     |
-| --- | --------------------- | ------------------------------------------------------------------- | ------------------------- |
-| 27  | Service health center | `packages/query-engine/src/health.ts` + `/system` → Health          | ✅ code                   |
-| 28  | Engine registry       | `/system` → Engines, read from engine/transform manifests           | ✅ code                   |
-| 29  | Failure isolation     | `runIsUsable()`, per-engine rows; invariant U5                      | ✅ code + test            |
-| 30  | Retry system          | `applyAction()` + row menu (records intent, never executes — N5)    | ✅ code                   |
-| 31  | Timeout management    | `EngineLimits` / `DEFAULT_LIMITS`                                   | ⚠️ boundary only          |
-| 32  | Resource manager      | `packages/query-engine/src/resources.ts` (fair share 60 %)          | ⚠️ boundary only          |
-| 33  | Hidden Cloud          | `29_RUNTIME_ENVIRONMENT.md` §7 — survey checklist, all `unverified` | ❌ open, needs the vendor |
+| §   | Requirement           | Where it now lives                                                      | State                            |
+| --- | --------------------- | ----------------------------------------------------------------------- | -------------------------------- |
+| 27  | Service health center | `packages/query-engine/src/health.ts` + `/system` → Health              | ✅ code                          |
+| 28  | Engine registry       | `/system` → Engines, read from engine/transform manifests               | ✅ code                          |
+| 29  | Failure isolation     | `runIsUsable()`, per-engine rows; invariant U5                          | ✅ code + test                   |
+| 30  | Retry system          | `applyAction()` + row menu (records intent, never executes — N5)        | ✅ code                          |
+| 31  | Timeout management    | `EngineLimits` / `DEFAULT_LIMITS`                                       | ⚠️ boundary only                 |
+| 32  | Resource manager      | `packages/query-engine/src/resources.ts` (fair share 60 %)              | ⚠️ boundary only                 |
+| 33  | Hidden Cloud          | `29_RUNTIME_ENVIRONMENT.md` §7 — VPS profile + `scripts/survey-host.sh` | ✅ resolved, capacity unmeasured |
 
-Design and the honest gap list: `29_RUNTIME_ENVIRONMENT.md`. §33 cannot be closed by this layer —
-it needs the owner to say which provider "Hidden Cloud" is, and until then the most restrictive
-assumption (no Docker/root/daemons/binaries) stays binding on `26` §4.
+Design and the honest gap list: `29_RUNTIME_ENVIRONMENT.md`. §33 was closed on 2026-08-25 once the
+owner confirmed the target: a self-managed Linux VPS (Ubuntu LTS, x86_64, root, Docker Engine,
+systemd, persistent disk, nginx + Let's Encrypt) rather than a PaaS. Containerized engines are
+therefore allowed with explicit per-container limits. What remains unverified is machine capacity —
+RAM, cores, disk, Docker version — which `scripts/survey-host.sh` answers when run on the host; the
+resource budget keeps its conservative defaults until that output is recorded.
