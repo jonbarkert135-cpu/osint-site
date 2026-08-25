@@ -6,9 +6,22 @@
  * result card carries the actions that are real here (open, expand, copy, evidence, dismiss) — the
  * ones that need a board live on the node once it is on the canvas; §23 `Build Graph` turns the
  * kept results into nodes, edges and a layout in one reviewable, undoable step.
+ *
+ * §25/§26 ride on every card and every relationship: what was observed, what this layer derived and
+ * what a model merely suggested never share a visual treatment, and a confidence is always shown
+ * with the two things that earn it — how many independent providers carried it and how much
+ * evidence is attached.
  */
 
-import type { InvestigationResult, ResolvedEntity } from '@nexus/query-engine';
+import {
+  ASSURANCE_LABEL,
+  CONFIDENCE_LABEL,
+  assessEntity,
+  assessRelation,
+  type Assessment,
+  type InvestigationResult,
+  type ResolvedEntity,
+} from '@nexus/query-engine';
 import { Button } from '@nexus/ui';
 import { useMemo, useState } from 'react';
 
@@ -38,6 +51,20 @@ export function ResultsDashboard({ result, onBuildGraph }: ResultsDashboardProps
 
   const kept = result.entities.filter((entity) => !entity.seed && !dismissed.has(entity.id));
 
+  // §25/§26: the badge pair every finding carries. Never a bare number, never a shared colour.
+  const marks = (assessment: Assessment) => (
+    <>
+      <span className="nx-assurance" data-assurance={assessment.assurance} title={assessment.why}>
+        {ASSURANCE_LABEL[assessment.assurance]}
+      </span>
+      <span className="nx-confidence" data-band={assessment.band} title={assessment.why}>
+        {CONFIDENCE_LABEL[assessment.band]} · {assessment.confidence.toFixed(2)} ·{' '}
+        {String(assessment.sourceCount)} source(s)
+        {assessment.evidenceCount > 0 ? ` · ${String(assessment.evidenceCount)} evidence` : ''}
+      </span>
+    </>
+  );
+
   const card = (entity: ResolvedEntity) => {
     const { url, raw } = sourceOf(entity);
     const isOpen = expanded.has(entity.id);
@@ -45,10 +72,9 @@ export function ResultsDashboard({ result, onBuildGraph }: ResultsDashboardProps
       <li key={entity.id} className="nx-result-card" data-evidence={evidence.has(entity.id)}>
         <div className="nx-result-head">
           <span className="nx-ask-step">{entity.label ?? entity.value}</span>
-          <span className="nx-muted">
-            {entity.kind} · {entity.confidence.toFixed(2)}
-          </span>
+          <span className="nx-muted">{entity.kind}</span>
         </div>
+        <div className="nx-result-marks">{marks(assessEntity(entity))}</div>
         <div className="nx-result-actions">
           {url === undefined ? null : (
             <a href={url} target="_blank" rel="noreferrer noopener">
@@ -78,6 +104,7 @@ export function ResultsDashboard({ result, onBuildGraph }: ResultsDashboardProps
               {[...new Set(entity.sources.map((source) => source.provider))].join(', ')} ·{' '}
               {String(entity.sources.length)} observation(s)
             </p>
+            <p className="nx-muted">{assessEntity(entity).why}</p>
             {raw === undefined ? (
               <p className="nx-muted">No raw payload was kept for this finding.</p>
             ) : (
@@ -136,6 +163,26 @@ export function ResultsDashboard({ result, onBuildGraph }: ResultsDashboardProps
           )}
         </section>
       ))}
+
+      {result.relations.length === 0 ? null : (
+        <details className="nx-dashboard-block" data-testid="ask-relations">
+          <summary>Relationships ({String(result.relations.length)})</summary>
+          <ul className="nx-relation-list">
+            {result.relations.map((relation) => {
+              const label = (id: string) =>
+                result.entities.find((entity) => entity.id === id)?.value ?? id;
+              return (
+                <li key={relation.id}>
+                  <span className="nx-ask-step">
+                    {label(relation.from)} → {relation.kind} → {label(relation.to)}
+                  </span>
+                  <span className="nx-result-marks">{marks(assessRelation(relation))}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </details>
+      )}
 
       {dashboard.recommendations.length === 0 ? null : (
         <section className="nx-dashboard-block" data-testid="ask-recommendations">

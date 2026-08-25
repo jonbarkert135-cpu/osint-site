@@ -1705,6 +1705,150 @@
     font: var(--text-mono);
   }
 
+  /* §25/§26 — observed, derived and inferred never share a treatment. */
+  .nx-result-marks {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--nx-space-2);
+  }
+
+  .nx-assurance,
+  .nx-confidence {
+    padding: 2px var(--nx-space-2);
+    border-radius: var(--nx-radius-full);
+    border: 1px solid var(--border-subtle);
+    font: var(--text-label);
+    white-space: nowrap;
+  }
+
+  .nx-assurance[data-assurance='observed'] {
+    border-color: var(--border-accent);
+    color: var(--fg-primary);
+  }
+
+  .nx-assurance[data-assurance='derived'] {
+    border-style: dashed;
+    color: var(--fg-secondary);
+  }
+
+  .nx-assurance[data-assurance='inference'] {
+    border-style: dotted;
+    border-color: var(--border-danger);
+    color: var(--fg-secondary);
+    font-style: italic;
+  }
+
+  .nx-confidence {
+    color: var(--fg-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .nx-confidence[data-band='high'] {
+    color: var(--fg-primary);
+  }
+
+  .nx-confidence[data-band='low'] {
+    border-style: dashed;
+  }
+
+  .nx-relation-list {
+    list-style: none;
+    margin: var(--nx-space-3) 0 0;
+    padding: 0;
+    display: grid;
+    gap: var(--nx-space-2);
+  }
+
+  .nx-relation-list li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--nx-space-2);
+  }
+
+  /* §24 — the pull-up run console. */
+  .nx-console {
+    margin-block-start: var(--nx-space-4);
+    border-block-start: 1px solid var(--border-subtle);
+  }
+
+  .nx-console-handle {
+    inline-size: 100%;
+    display: flex;
+    align-items: center;
+    gap: var(--nx-space-2);
+    padding: var(--nx-space-2) 0;
+    border: 0;
+    background: none;
+    color: var(--fg-secondary);
+    font: var(--text-label);
+    cursor: pointer;
+  }
+
+  .nx-console-handle:hover {
+    color: var(--fg-primary);
+  }
+
+  .nx-console-handle .nx-muted {
+    margin-inline-start: auto;
+  }
+
+  .nx-console-arrow {
+    display: inline-block;
+    transition: transform 180ms ease;
+  }
+
+  .nx-console[data-open='true'] .nx-console-arrow {
+    transform: rotate(180deg);
+  }
+
+  .nx-console-body {
+    max-block-size: 0;
+    overflow: hidden auto;
+    background: var(--surface-1);
+    border-radius: var(--nx-radius-3);
+    transition: max-block-size 200ms ease;
+  }
+
+  .nx-console[data-open='true'] .nx-console-body {
+    max-block-size: 220px;
+    padding: var(--nx-space-3);
+  }
+
+  .nx-console-line {
+    display: flex;
+    gap: var(--nx-space-3);
+    margin: 0;
+    font: var(--text-mono);
+    color: var(--fg-secondary);
+  }
+
+  .nx-console-line[data-level='good'] {
+    color: var(--fg-primary);
+  }
+
+  .nx-console-line[data-level='warn'] {
+    color: var(--fg-muted);
+  }
+
+  .nx-console-line[data-level='error'] {
+    color: var(--border-danger);
+  }
+
+  .nx-console-seq {
+    color: var(--fg-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .nx-console-arrow,
+    .nx-console-body {
+      transition: none;
+    }
+  }
+
   .nx-dashboard-block {
     font: var(--text-body-sm);
   }

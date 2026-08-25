@@ -38,6 +38,16 @@ export interface StepProgress {
   readonly produced: number;
 }
 
+/**
+ * One line of the run console (Part 2 §24). The console exists so the app is never a black box:
+ * every line answers one of *what is running, why, on what data, what came back*.
+ */
+export interface ConsoleLine {
+  readonly seq: number;
+  readonly level: 'info' | 'good' | 'warn' | 'error';
+  readonly text: string;
+}
+
 export interface QueryRunState {
   readonly phase: RunPhase;
   readonly steps: readonly StepProgress[];
@@ -48,7 +58,23 @@ export interface QueryRunState {
   readonly found: number;
   readonly result: InvestigationResult | null;
   readonly error: string | null;
+  /** Newest last; capped, because a long run must not grow the tab without bound. */
+  readonly log: readonly ConsoleLine[];
 }
+
+const LOG_LIMIT = 500;
+
+const say = (
+  state: QueryRunState,
+  level: ConsoleLine['level'],
+  text: string,
+): readonly ConsoleLine[] => {
+  const line: ConsoleLine = { seq: (state.log.at(-1)?.seq ?? 0) + 1, level, text };
+  return [...state.log, line].slice(-LOG_LIMIT);
+};
+
+const on = (input: { readonly kind: string; readonly value: string }): string =>
+  `${input.kind} ${input.value}`;
 
 const EMPTY: QueryRunState = {
   phase: 'idle',
@@ -58,6 +84,7 @@ const EMPTY: QueryRunState = {
   found: 0,
   result: null,
   error: null,
+  log: [],
 };
 
 const upsert = (
@@ -84,10 +111,25 @@ const upsert = (
 export function reduceEvent(state: QueryRunState, event: QueryEvent): QueryRunState {
   switch (event.type) {
     case 'plan.started':
-      return { ...EMPTY, phase: 'running' };
+      return {
+        ...EMPTY,
+        phase: 'running',
+        log: say(
+          EMPTY,
+          'info',
+          `plan started · ${String(event.steps)} step(s) in ${String(event.stages)} stage(s)`,
+        ),
+      };
     case 'plan.graph':
       return {
         ...state,
+        log: say(
+          state,
+          'info',
+          `plan graph · depth ${String(event.depth)} · up to ${String(event.width)} in parallel${
+            event.warnings.length > 0 ? ` · ${event.warnings.join('; ')}` : ''
+          }`,
+        ),
         steps: event.nodes.reduce<readonly StepProgress[]>(
           (steps, node) =>
             upsert(steps, node.transform, {
@@ -101,6 +143,11 @@ export function reduceEvent(state: QueryRunState, event: QueryEvent): QueryRunSt
     case 'step.started':
       return {
         ...state,
+        log: say(
+          state,
+          'info',
+          `run ${event.step.transform} via ${event.engine} on ${on(event.step.input)}`,
+        ),
         steps: upsert(state.steps, event.step.transform, {
           state: 'running',
           detail: `via ${event.engine}`,
@@ -120,6 +167,7 @@ export function reduceEvent(state: QueryRunState, event: QueryEvent): QueryRunSt
     case 'step.skipped':
       return {
         ...state,
+        log: say(state, 'warn', `skip ${event.step.transform} · ${event.reason}`),
         steps: upsert(state.steps, event.step.transform, {
           state: 'skipped',
           detail: event.reason,
@@ -127,10 +175,32 @@ export function reduceEvent(state: QueryRunState, event: QueryEvent): QueryRunSt
         }),
       };
     case 'entity.found':
-      return { ...state, found: state.found + 1 };
+      return {
+        ...state,
+        found: state.found + 1,
+        log: say(
+          state,
+          'good',
+          `found ${event.entity.kind} ${event.entity.value} · ${event.entity.confidence.toFixed(2)} · ${event.step.transform}`,
+        ),
+      };
+    case 'relation.found':
+      return {
+        ...state,
+        log: say(
+          state,
+          'good',
+          `link ${event.relation.kind} · ${event.relation.derived ? 'derived' : 'observed'} · ${event.relation.confidence.toFixed(2)}`,
+        ),
+      };
     case 'step.done':
       return {
         ...state,
+        log: say(
+          state,
+          event.status === 'completed' ? 'good' : 'warn',
+          `done ${event.step.transform} · ${String(event.produced)} result(s)${event.cached ? ' · cached' : ''}`,
+        ),
         steps: upsert(state.steps, event.step.transform, {
           state: 'done',
           detail: `${String(event.produced)} result(s)${event.cached ? ' · cached' : ''}`,
@@ -141,6 +211,11 @@ export function reduceEvent(state: QueryRunState, event: QueryEvent): QueryRunSt
     case 'step.failed':
       return {
         ...state,
+        log: say(
+          state,
+          event.fallback ? 'warn' : 'error',
+          `${event.fallback ? 'retry' : 'fail'} ${event.step.transform} · ${event.message}`,
+        ),
         steps: upsert(state.steps, event.step.transform, {
           state: event.fallback ? 'running' : 'failed',
           detail: event.fallback ? `retrying after: ${event.message}` : event.message,
@@ -211,6 +286,11 @@ export function useQueryRun(options: UseQueryRunOptions = {}): QueryRunControlle
               progress: 1,
               inFlight: 0,
               result,
+              log: say(
+                current,
+                'good',
+                `run finished · ${String(result.entities.length)} entities · ${String(result.relations.length)} relationships · ${String(result.provenance.length)} sources`,
+              ),
             }));
             return;
           }
@@ -218,11 +298,15 @@ export function useQueryRun(options: UseQueryRunOptions = {}): QueryRunControlle
           setState((current) => reduceEvent(current, event));
         }
       } catch (cause) {
-        setState((current) => ({
-          ...current,
-          phase: 'failed',
-          error: cause instanceof Error ? cause.message : 'The run failed.',
-        }));
+        setState((current) => {
+          const message = cause instanceof Error ? cause.message : 'The run failed.';
+          return {
+            ...current,
+            phase: 'failed',
+            error: message,
+            log: say(current, 'error', message),
+          };
+        });
       }
     },
     [registry, engines, cache, options.fetch, options.mode],

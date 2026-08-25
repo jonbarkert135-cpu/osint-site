@@ -130,3 +130,45 @@ Graph/Timeline/Table/Map views over a whole board are still gap item 6 and unaff
 
 Recommendations are computed, not written: duplicates to review, failed services, findings under
 0.5 confidence, findings with no source URL, and findings with no relations yet.
+
+## 8. Batch §24–§26 — no black box: control, fact vs inference, confidence (2026-08-25)
+
+| §   | Requirement                     | Where it now lives                                                                      | State   |
+| --- | ------------------------------- | --------------------------------------------------------------------------------------- | ------- |
+| 24  | User control / run console      | `apps/web/src/query/RunConsole.tsx` + `log` in `useQueryRun.ts`, folded into `AskPanel` | ✅ code |
+| 25  | Observed vs Derived vs AI       | `packages/query-engine/src/assurance.ts` (`assessEntity`, `assessRelation`)             | ✅ code |
+| 26  | Confidence + sources + evidence | `Assessment.band / sourceCount / evidenceCount / why`, shown on every card and edge     | ✅ code |
+
+§24 asks the app to answer four questions at any moment: what is running, why, on what data, and
+what came back. The run already emits exactly those facts as events, so the console is a projection
+of the event stream, not a second source of truth: `reduceEvent` appends one line per event
+(`run <transform> via <engine> on <kind> <value>`, `found …`, `done … · N result(s)`, `skip …`,
+`fail …`) and the drawer renders them. It is a **log, not a control** — nothing in it writes, so it
+cannot drift out of step with the run it describes. The handle sits at the foot of Ask Raven with an
+arrow, closed by default, `aria-expanded` on the button, `role="log"` + `aria-live="polite"` on the
+body, animation disabled under `prefers-reduced-motion`. The log is capped at 500 lines so a long
+run cannot grow the tab without bound.
+
+Results still land on the board through Build Graph (§23) rather than through the console: two write
+paths for the same act would be two places to be inconsistent.
+
+§25 is a single pure classifier, so the vocabulary cannot fork between screens:
+
+- **Observed** — a provider stated it and left evidence (an excerpt, a URL or a raw payload).
+- **Derived** — this layer worked it out by combining observations, or the resolver inferred the
+  edge (`ResolvedRelation.derived`). Nothing pointed at it directly.
+- **AI inference** — every source behind it came from a model engine (`ai*`, `llm*`, `infer*`).
+  A hypothesis, and it says so in words as well as in colour.
+
+The three never share a visual treatment: solid accent border, dashed neutral, dotted danger +
+italics. Colour is never the only signal (the word is always present), which is also what keeps it
+readable for colour-blind analysts.
+
+§26 never shows a bare number. Every finding and every relationship carries `High / Medium / Low ·
+0.NN · N source(s) · N evidence`, where the source count is _independent providers_ — the same
+provider repeating itself is one observation, not corroboration (`corroborate`, §7.4) — and the
+`why` sentence is available on hover and inside the expanded card.
+
+Deliberately not built here: a per-finding "dispute/confirm" control that would let an analyst
+overwrite a computed confidence. Confidence is evidence-derived; letting a click overwrite it would
+make the number unfalsifiable. Marking a finding as evidence (§22) is the honest version of that.
