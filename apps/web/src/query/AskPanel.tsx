@@ -22,6 +22,7 @@ import type * as Y from 'yjs';
 
 import { ProposalReview } from '../integrations/ProposalReview.tsx';
 import { toImportProposal } from './investigationProposal.ts';
+import { ResultsDashboard } from './ResultsDashboard.tsx';
 import { useQueryRun } from './useQueryRun.ts';
 
 export interface AskPanelProps {
@@ -111,6 +112,39 @@ export function AskPanel({ open, onClose, doc, boardId, onUndo, hostFetch }: Ask
       runner.reset();
     },
     [proposal, doc, runner],
+  );
+
+  // §23 Build Graph: the kept results become nodes, edges and a layout in one apply — the same
+  // write path the review panel uses, so it stays one undo step and one provenance trail.
+  const buildGraph = useCallback(
+    (entityIds: readonly string[]) => {
+      if (proposal === null || investigation === null) return;
+      const kept = new Set(entityIds);
+      const tempIdByEntity = new Map(
+        investigation.entities
+          .filter((entity) => !entity.seed)
+          .map((entity, index) => [entity.id, `q-${String(index)}`] as const),
+      );
+      const keptTempIds = new Set<string>(
+        [...kept].map((id) => tempIdByEntity.get(id)).filter((id) => id !== undefined),
+      );
+      const itemIds = proposal.items
+        .filter((item) => {
+          if (item.kind === 'new_node') return keptTempIds.has(item.node.tempId);
+          if (item.kind !== 'new_edge') return false;
+          const { fromRef, toRef } = item.edge;
+          // An edge survives only with both endpoints: half an edge is a broken graph.
+          return (
+            fromRef.kind === 'temp' &&
+            toRef.kind === 'temp' &&
+            keptTempIds.has(fromRef.tempId) &&
+            keptTempIds.has(toRef.tempId)
+          );
+        })
+        .map((item) => item.id);
+      apply(itemIds);
+    },
+    [proposal, investigation, apply],
   );
 
   if (!open) return null;
@@ -243,36 +277,11 @@ export function AskPanel({ open, onClose, doc, boardId, onUndo, hostFetch }: Ask
         </ul>
       ) : null}
 
-      {investigation !== null && investigation.entities.length > 0 ? (
-        <ul className="nx-ask-results" data-testid="ask-results">
-          {investigation.entities
-            .filter((entity) => !entity.seed)
-            .map((entity) => {
-              const refs = entity.sources.flatMap((source) => source.refs ?? []);
-              const url = refs.find((ref) => ref.url !== undefined)?.url;
-              const raw = refs.find((ref) => ref.raw !== undefined)?.raw;
-              return (
-                <li key={entity.id}>
-                  <span className="nx-ask-step">{entity.label ?? entity.value}</span>
-                  <span className="nx-muted">
-                    {entity.kind} · {entity.confidence.toFixed(2)} ·{' '}
-                    {[...new Set(entity.sources.map((source) => source.provider))].join(', ')}
-                  </span>
-                  {url === undefined ? null : (
-                    <a href={url} target="_blank" rel="noreferrer noopener">
-                      Open source
-                    </a>
-                  )}
-                  {raw === undefined ? null : (
-                    <details>
-                      <summary>View raw result</summary>
-                      <pre>{JSON.stringify(raw, null, 2).slice(0, 4000)}</pre>
-                    </details>
-                  )}
-                </li>
-              );
-            })}
-        </ul>
+      {investigation !== null && investigation.entities.some((entity) => !entity.seed) ? (
+        <ResultsDashboard
+          result={investigation}
+          {...(proposal === null || doc === undefined ? {} : { onBuildGraph: buildGraph })}
+        />
       ) : null}
 
       {investigation !== null && investigation.duplicates.length > 0 ? (

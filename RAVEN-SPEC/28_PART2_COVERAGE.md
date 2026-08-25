@@ -97,3 +97,36 @@ Fuzzy name matching (edit distance on people or companies) is out of scope until
 
 Still open after this batch: raw chunks live only for the lifetime of the run (nothing persists
 them to `packages/db`), so "View raw result" works inside the session and not on a reopened board.
+
+## 7. Batch §20–§23 — the dashboard the run builds for itself (2026-08-25)
+
+| §   | Requirement                     | Where it now lives                                                                         | State   |
+| --- | ------------------------------- | ------------------------------------------------------------------------------------------ | ------- |
+| 20  | Dynamic dashboard from services | `apps/web/src/query/dashboard.ts` (`buildDashboard`) + `ResultsDashboard.tsx`              | ✅ code |
+| 21  | Per-service panels, one design  | `ServicePanel` per provider, rendered with the shared tokens — no per-tool styling         | ✅ code |
+| 22  | Result-card interaction         | Open source · Expand · Copy · Mark as evidence · Dismiss on every card                     | ✅ code |
+| 23  | Build Graph                     | `ResultsDashboard` → `AskPanel.buildGraph` → `applyProposal` (nodes, edges, radial layout) | ✅ code |
+
+The overview is assembled from the run, never declared: a counter exists because the run produced
+that kind, and a service panel exists because that provider was asked. A provider that returned
+nothing keeps its panel and says "no results" — an empty answer from Sherlock is a finding, and
+hiding it would make the dashboard lie by omission.
+
+Deliberately **not** built from the §22 list: `add to canvas` per card, `connect`, `bookmark`,
+`tag`, `inspect source` as a separate view, `export`. Per-card `add to canvas` would be a second
+write path next to Build Graph (one way to do one thing); `connect`, `tag` and `bookmark` already
+exist on the node once it is on the canvas, and duplicating them here would mean two places to
+maintain and two places to be inconsistent. `export` is gap item 7 and belongs to the board, not to
+one run. `inspect source` and `inspect raw` are the same click here: `Expand` → `View raw result`.
+
+Build Graph is a filter plus the existing commit: the analyst dismisses what is noise, and the kept
+entities become nodes, their relations become edges (only when both endpoints survive), the radial
+layout places them, and the whole thing lands as **one** undo step through `applyProposal` — the
+same write path an integration import uses, with the same provenance (U7/N4).
+
+The alternate views the batch lists next to the graph — timeline, entities, evidence, service
+results, raw data, recommendations — ship as sections of this dashboard. The standalone
+Graph/Timeline/Table/Map views over a whole board are still gap item 6 and unaffected by this batch.
+
+Recommendations are computed, not written: duplicates to review, failed services, findings under
+0.5 confidence, findings with no source URL, and findings with no relations yet.
