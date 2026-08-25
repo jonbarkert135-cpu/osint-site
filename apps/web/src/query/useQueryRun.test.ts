@@ -13,6 +13,7 @@ const base = {
   found: 0,
   result: null,
   error: null,
+  log: [],
 };
 
 const fold = (events: readonly QueryEvent[]) => events.reduce(reduceEvent, base);
@@ -24,7 +25,11 @@ describe('reduceEvent', () => {
   });
 
   it('counts results as they stream in, before the run finishes', () => {
-    const found = { type: 'entity.found', step, entity: {} } as unknown as QueryEvent;
+    const found = {
+      type: 'entity.found',
+      step,
+      entity: { kind: 'host', value: 'a.example.com', confidence: 0.8 },
+    } as unknown as QueryEvent;
     expect(fold([found, found, found]).found).toBe(3);
   });
 
@@ -132,5 +137,42 @@ describe('reduceEvent', () => {
     const skipped = fold([{ type: 'step.skipped', step, reason: 'budget-exhausted' }]);
     expect(done.steps[0]?.fraction).toBe(1);
     expect(skipped.steps[0]?.fraction).toBe(1);
+  });
+});
+
+describe('the run console log (§24)', () => {
+  it('says what is running, through which engine and on what data', () => {
+    const state = fold([{ type: 'step.started', step, engine: 'ct-log-search' }]);
+    expect(state.log.at(-1)?.text).toBe('run domain.certificates via ct-log-search on domain a');
+  });
+
+  it('records what came back, and marks a failure as an error', () => {
+    const state = fold([
+      {
+        type: 'step.done',
+        step,
+        engine: 'ct-log-search',
+        status: 'completed',
+        produced: 2,
+        cached: false,
+        run: {},
+      } as unknown as QueryEvent,
+      { type: 'step.failed', step, engine: 'ct-log-search', message: 'timeout', fallback: false },
+    ]);
+    expect(state.log.map((line) => line.text)).toEqual([
+      'done domain.certificates · 2 result(s)',
+      'fail domain.certificates · timeout',
+    ]);
+    expect(state.log.at(-1)?.level).toBe('error');
+    expect(state.log.map((line) => line.seq)).toEqual([1, 2]);
+  });
+
+  it('starts a fresh log for a fresh plan', () => {
+    const state = fold([
+      { type: 'step.started', step, engine: 'ct-log-search' },
+      { type: 'plan.started', stages: 2, steps: 3 },
+    ]);
+    expect(state.log).toHaveLength(1);
+    expect(state.log[0]?.text).toBe('plan started · 3 step(s) in 2 stage(s)');
   });
 });

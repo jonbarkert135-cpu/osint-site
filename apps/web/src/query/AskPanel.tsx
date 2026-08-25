@@ -23,6 +23,7 @@ import type * as Y from 'yjs';
 import { ProposalReview } from '../integrations/ProposalReview.tsx';
 import { toImportProposal } from './investigationProposal.ts';
 import { ResultsDashboard } from './ResultsDashboard.tsx';
+import { RunConsole } from './RunConsole.tsx';
 import { useQueryRun } from './useQueryRun.ts';
 
 export interface AskPanelProps {
@@ -56,6 +57,8 @@ export function AskPanel({ open, onClose, doc, boardId, onUndo, hostFetch }: Ask
   const [override, setOverride] = useState<EntityKind | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
   const [applied, setApplied] = useState<string | null>(null);
+  // §24: folded away by default — available in one click, never in the way.
+  const [consoleOpen, setConsoleOpen] = useState(false);
   const runner = useQueryRun(hostFetch === undefined ? {} : { fetch: hostFetch });
 
   // The panel is opened from the palette, so the caret must land in the field: the alternative is
@@ -329,6 +332,15 @@ export function AskPanel({ open, onClose, doc, boardId, onUndo, hostFetch }: Ask
           The run finished with {String(investigation.entities.length)} entities. Open a board to
           land them on a canvas.
         </p>
+      ) : null}
+
+      {runner.log.length > 0 || runner.phase !== 'idle' ? (
+        <RunConsole
+          lines={runner.log}
+          open={consoleOpen}
+          onToggle={() => setConsoleOpen((current) => !current)}
+          running={runner.phase === 'running'}
+        />
       ) : null}
 
       {result.hidden.length > 0 ? (
