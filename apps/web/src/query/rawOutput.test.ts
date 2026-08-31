@@ -1,7 +1,8 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   clearRawOutput,
+  downloadRawOutput,
   hasRawOutput,
   keepRawOutput,
   rawOutputOf,
@@ -32,5 +33,19 @@ describe('raw run output', () => {
     for (let index = 0; index < 25; index += 1) keepRawOutput(`run-${String(index)}`, [chunk('x')]);
     expect(hasRawOutput('run-0')).toBe(false);
     expect(hasRawOutput('run-24')).toBe(true);
+  });
+
+  it('downloads the kept output as one JSONL file, and nothing when there is none', () => {
+    const createObjectURL = vi.fn(() => 'blob:raw');
+    const revokeObjectURL = vi.fn();
+    Object.assign(URL, { createObjectURL, revokeObjectURL });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    expect(downloadRawOutput(['run-1'])).toBe(false);
+    keepRawOutput('run-1', [chunk('a')]);
+    expect(downloadRawOutput(['run-1'])).toBe(true);
+    expect(click).toHaveBeenCalledOnce();
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:raw');
+    click.mockRestore();
   });
 });
