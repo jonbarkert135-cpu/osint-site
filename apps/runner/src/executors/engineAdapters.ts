@@ -7,7 +7,13 @@
  * one confinement, not a second unreviewed door (N5).
  */
 
-import { createCatalogRegistry, createCliAdapter, createPythonAdapter } from '@nexus/transforms';
+import {
+  createCatalogRegistry,
+  createCliAdapter,
+  createGoAdapter,
+  createPythonAdapter,
+  createRustAdapter,
+} from '@nexus/transforms';
 import type { AdapterInput, CliExit, CliRun, EngineAdapter } from '@nexus/transforms';
 import {
   effectiveLimits,
@@ -92,10 +98,18 @@ export const createEngineCliRun = (deps: EngineAdapterDeps): CliRun => {
   };
 };
 
-/** The two adapters this host can serve. Registering them is the caller's call. */
+/**
+ * The adapters this host can serve: cli, python, go and rust — one `run`, four passports (§38).
+ * Registering them is the caller's call.
+ */
 export const createEngineAdapters = (
   deps: EngineAdapterDeps,
-): readonly [EngineAdapter, EngineAdapter] => {
+): readonly [EngineAdapter, EngineAdapter, EngineAdapter, EngineAdapter] => {
   const run = createEngineCliRun(deps);
-  return [createCliAdapter({ run }), createPythonAdapter({ run })];
+  return [
+    createCliAdapter({ run }),
+    createPythonAdapter({ run }),
+    createGoAdapter({ run }),
+    createRustAdapter({ run }),
+  ];
 };

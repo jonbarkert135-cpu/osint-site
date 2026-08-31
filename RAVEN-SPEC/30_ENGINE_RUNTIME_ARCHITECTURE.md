@@ -83,6 +83,15 @@ the run continues on the box. This preserves invariant **N2 — local-first**: R
 usable on one machine. The queue is bounded (500 jobs) because an unbounded queue on a single VPS
 is a memory leak with a nice name.
 
+The worker half is `packages/transforms/src/remoteWorker.ts`: `createRemoteWorker()` claims a job,
+runs it through an injected `execute`, and posts the result back. `claim`/`complete` are injected
+too, so the same loop drives the in-process queue on one box or an HTTP Result API on a second
+machine — the file holds no transport, no timer and no process API, which keeps it inside the
+browser-safe bundle (N2) and the single process door in the runner (N5). A throw inside `execute`
+becomes a retryable `internal` failure instead of a stopped drain (U5), and `drain(maxJobs)` is
+bounded so one worker cannot hog the box. Scheduling — how often to call `drain()` — stays the
+operator's decision.
+
 ## 5. Adapter boundary (§37)
 
 The core knows exactly five things: **input, execution, progress, output, error**. It never learns
@@ -101,13 +110,19 @@ so a skipped engine always states why (invariant U5, partial beats perfect).
 `ENGINE_RUNTIMES` accepts node, python, go, rust, cli, http, external-api and browser-worker. What
 is actually wired is a separate, honest table — `ADAPTER_SUPPORT`:
 
-| Runtime                               | Adapter     |
-| ------------------------------------- | ----------- |
-| node, http, external-api, cli, python | implemented |
-| go, rust, browser-worker              | planned     |
+| Runtime                                         | Adapter     |
+| ----------------------------------------------- | ----------- |
+| node, http, external-api, cli, python, go, rust | implemented |
+| browser-worker                                  | planned     |
 
-The architecture is ready for all eight; the UI says "adapter planned" for the three that are not,
+The architecture is ready for all eight; the UI says "adapter planned" for the one that is not,
 rather than failing at run time.
+
+`go` and `rust` are compiled binaries the host invokes exactly like any other CLI, so they are
+`createCliAdapter` with their own runtime label (`createGoAdapter`, `createRustAdapter`) rather than
+new code: relabelling them `cli` would make the matrix lie about what an engine is. `browser-worker`
+stays planned because it is genuinely different — it needs no process at all, and no engine in the
+registry asks for it yet.
 
 `cli` and `python` are one implementation (`src/cliAdapter.ts`): from the core's side both are
 "render argv, run it somewhere, read stdout", and the difference between a Go binary and a Python
@@ -136,7 +151,9 @@ run console (§24).
    an engine run is confined exactly like every other run). What is still missing is upstream of
    them: the query executor does not yet dispatch a plan step through `AdapterRegistry`, and the
    containerized engines have no pinned image digest (`13_SHERLOCK.md` §1.2).
-3. No external worker implementation ships with the repo; the queue is exercised by tests only.
+3. The external worker loop ships (`packages/transforms/src/remoteWorker.ts`) but no deployment
+   does: nothing in the repo runs it on a second machine, and no HTTP transport is written, so §36
+   is still exercised by tests rather than in production.
 4. Footprints for derived passports are conservative defaults, not measurements. Real numbers come
    from running the engines under the resource manager (`29` §6) and recording what they use.
 

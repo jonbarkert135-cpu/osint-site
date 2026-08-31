@@ -26,8 +26,8 @@ export const ADAPTER_SUPPORT: Readonly<Record<EngineRuntime, 'implemented' | 'pl
   'external-api': 'implemented',
   cli: 'implemented',
   python: 'implemented',
-  go: 'planned',
-  rust: 'planned',
+  go: 'implemented',
+  rust: 'implemented',
   'browser-worker': 'planned',
 };
 

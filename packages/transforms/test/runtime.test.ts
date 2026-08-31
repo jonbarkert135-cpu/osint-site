@@ -160,7 +160,9 @@ describe('containerArgs', () => {
 
 describe('ADAPTER_SUPPORT', () => {
   it('is honest about which runtimes are only planned', () => {
-    expect(ADAPTER_SUPPORT.rust).toBe('planned');
+    expect(ADAPTER_SUPPORT['browser-worker']).toBe('planned');
+    expect(ADAPTER_SUPPORT.rust).toBe('implemented');
+    expect(ADAPTER_SUPPORT.go).toBe('implemented');
     expect(ADAPTER_SUPPORT.http).toBe('implemented');
     expect(ADAPTER_SUPPORT.cli).toBe('implemented');
     expect(ADAPTER_SUPPORT.python).toBe('implemented');

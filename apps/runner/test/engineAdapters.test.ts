@@ -113,9 +113,14 @@ describe('engine adapters over the execution layer (§37, §38)', () => {
     expect(killed).toMatchObject({ code: null });
   });
 
-  it('produces one cli and one python adapter over the same host binding', async () => {
-    const [cli, python] = createEngineAdapters(deps(result({})));
-    expect([cli.runtime, python.runtime]).toEqual(['cli', 'python']);
+  it('produces the cli, python, go and rust adapters over the same host binding', async () => {
+    const [cli, python, go, rust] = createEngineAdapters(deps(result({})));
+    expect([cli, python, go, rust].map((adapter) => adapter.runtime)).toEqual([
+      'cli',
+      'python',
+      'go',
+      'rust',
+    ]);
     await expect(cli.execute(input)).resolves.toEqual({
       ok: true,
       output: { items: [{ site: 'github' }], raw: '{"site":"github"}' },

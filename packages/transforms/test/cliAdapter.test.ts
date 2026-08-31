@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createCliAdapter, createPythonAdapter, parseCliStdout } from '../src/cliAdapter.ts';
+import {
+  createCliAdapter,
+  createGoAdapter,
+  createPythonAdapter,
+  parseCliStdout,
+  createRustAdapter,
+} from '../src/cliAdapter.ts';
 import type { AdapterInput } from '../src/adapters.ts';
 import type { CliExit } from '../src/cliAdapter.ts';
 
@@ -91,9 +97,10 @@ describe('cli adapter (§37, §38)', () => {
     });
   });
 
-  it('python is the same adapter with its own passport', () => {
-    expect(createPythonAdapter({ run: async () => ({ code: 0, stdout: '' }) }).runtime).toBe(
-      'python',
-    );
+  it('python, go and rust are the same adapter with their own passports', () => {
+    const run = async () => ({ code: 0, stdout: '' });
+    expect(createPythonAdapter({ run }).runtime).toBe('python');
+    expect(createGoAdapter({ run }).runtime).toBe('go');
+    expect(createRustAdapter({ run }).runtime).toBe('rust');
   });
 });

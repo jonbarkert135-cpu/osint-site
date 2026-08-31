@@ -138,3 +138,15 @@ export const createCliAdapter = (options: CliAdapterOptions): EngineAdapter => (
 /** Python engines are containerized CLIs; same contract, different passport (§34). */
 export const createPythonAdapter = (options: Omit<CliAdapterOptions, 'runtime'>): EngineAdapter =>
   createCliAdapter({ ...options, runtime: 'python' });
+
+/**
+ * Go and Rust engines are compiled binaries the host invokes exactly like any other CLI (§38).
+ * They get their own registered runtime rather than being relabelled `cli`, so the matrix keeps
+ * telling the truth about what an engine is — and nothing more is needed, because "render argv,
+ * run it somewhere, read stdout" is already the whole contract.
+ */
+export const createGoAdapter = (options: Omit<CliAdapterOptions, 'runtime'>): EngineAdapter =>
+  createCliAdapter({ ...options, runtime: 'go' });
+
+export const createRustAdapter = (options: Omit<CliAdapterOptions, 'runtime'>): EngineAdapter =>
+  createCliAdapter({ ...options, runtime: 'rust' });
