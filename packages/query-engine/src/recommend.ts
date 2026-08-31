@@ -67,6 +67,7 @@ const REASON_TEXT: Readonly<Record<ExclusionReason, string>> = {
   'no-engine': 'no engine implements it',
   'budget-exhausted': 'the run budget is already spent',
   'already-covered': 'already run against this entity',
+  'over-capacity': 'no free capacity right now',
 };
 
 const tierFor = (transform: TransformManifest, usable: boolean): ServiceTier => {
