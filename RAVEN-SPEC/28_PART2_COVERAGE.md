@@ -365,3 +365,26 @@ a go/rust engine gets the identical sandbox, egress proxy and limits. `browser-w
 `planned` on purpose: it needs no process at all and no engine in the registry asks for it.
 
 Unchanged limit: containerized engines still need a pinned image digest before a host may run them.
+
+## Batch: §36 core side, §37 dispatch (2026-08-31)
+
+| §   | Point                 | Where                                     | State                      |
+| --- | --------------------- | ----------------------------------------- | -------------------------- |
+| 36  | Core → queue → worker | `packages/transforms/src/queueAdapter.ts` | ✅ loop closed both ways   |
+| 37  | Plan step → adapter   | `registryEngines()` in `sdk/engines`      | ✅ registry-driven library |
+
+**§36 (core side).** `createQueueAdapter()` makes the remote queue reachable from a plan without any
+caller learning it exists: it is an `EngineAdapter` that enqueues, lets an attached worker settle,
+and returns whatever came back. A worker's _failure_ is returned as the answer — running the tool
+again locally after the worker already ran it would double the work and the cost. An unclaimed job
+falls back to the local adapter (N2, local-first); with no local adapter the refusal is
+`unavailable`/retryable, stated rather than hung. No timer and no fetch: the host injects `settle`.
+
+**§37 (dispatch).** `registryEngines(adapters, catalog)` builds the executor's engine library from
+an `AdapterRegistry`, filtered by `canDispatch()`. An engine whose runtime has no adapter on this
+host is absent from the library, so the step is skipped as `engine-unavailable` with a reason —
+never a pretend capability (U5).
+
+Honest gaps unchanged: no process owns both an adapter registry and the plan executor yet (the
+browser has no adapter by design, the runner does not execute plans), there is no HTTP transport or
+worker deployment, and containerized engines still need pinned image digests.

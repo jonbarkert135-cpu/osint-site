@@ -7,7 +7,8 @@
  * kept honestly rather than by another abstraction.
  */
 
-import type { EngineAdapter } from '../../adapters.ts';
+import { canDispatch, type AdapterRegistry, type EngineAdapter } from '../../adapters.ts';
+import type { TransformRegistry } from '../../registry.ts';
 import type { EngineId } from '../../types.ts';
 import { createAdapterEngine } from '../adapterEngine.ts';
 import type { TransformEngine } from '../types.ts';
@@ -82,3 +83,31 @@ export const adapterEngines = (
   amass: () => createAmass(cli),
   sherlock: () => createSherlock(python),
 });
+
+/** The shipped adapter-backed engines, by id. */
+const FACTORIES: Readonly<Record<EngineId, (adapter: EngineAdapter) => TransformEngine>> = {
+  subfinder: createSubfinder,
+  amass: createAmass,
+  sherlock: createSherlock,
+};
+
+/**
+ * The engine library an `AdapterRegistry` can actually serve — the missing link between the
+ * adapters (§37) and plan execution (§11–§14). An engine whose runtime has no adapter on this host
+ * is simply absent, so the executor skips its step with `engine-unavailable` instead of the host
+ * pretending a Python tool is installed (U5: a stated gap beats a fake capability).
+ */
+export const registryEngines = (
+  adapters: AdapterRegistry,
+  catalog: TransformRegistry,
+): Readonly<Record<EngineId, () => TransformEngine>> => {
+  const library: Record<EngineId, () => TransformEngine> = {};
+  for (const [id, create] of Object.entries(FACTORIES)) {
+    const manifest = catalog.engine(id);
+    if (manifest === undefined || canDispatch(adapters, manifest) !== null) continue;
+    const adapter = adapters.for(manifest);
+    if (adapter === undefined) continue;
+    library[id] = () => create(adapter);
+  }
+  return library;
+};

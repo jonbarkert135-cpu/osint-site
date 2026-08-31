@@ -92,6 +92,14 @@ becomes a retryable `internal` failure instead of a stopped drain (U5), and `dra
 bounded so one worker cannot hog the box. Scheduling — how often to call `drain()` — stays the
 operator's decision.
 
+The core half is `packages/transforms/src/queueAdapter.ts`: `createQueueAdapter()` is an ordinary
+`EngineAdapter` that enqueues instead of executing, so a plan step reaches the queue without knowing
+it exists. When a worker answered, its result is returned as-is — including a failure, which is the
+worker's answer and not a reason to quietly run the tool twice. When nobody claimed the job, the
+call falls back to the configured local adapter, and with no local adapter it reports
+`unavailable`/retryable rather than hanging. _When_ a worker gets its turn is injected as `settle`,
+so the file holds no timer and stays browser-safe (N2).
+
 ## 5. Adapter boundary (§37)
 
 The core knows exactly five things: **input, execution, progress, output, error**. It never learns
@@ -104,6 +112,13 @@ tool-agnostic) expressed in types.
 
 `canDispatch()` returns a typed refusal — `host-incompatible`, `adapter-planned`, `no-adapter` —
 so a skipped engine always states why (invariant U5, partial beats perfect).
+
+`registryEngines(adapters, catalog)` (`sdk/engines/cli-engines.ts`) turns a registry into the engine
+library the executor consumes: every shipped adapter-backed engine that `canDispatch` accepts on
+this host, and nothing else. A host wires it with
+`createEngineLibrary({ ...BUILTIN_ENGINES, ...registryEngines(adapters, catalog) })`; an engine
+whose runtime has no adapter here is simply absent, and the executor skips its step as
+`engine-unavailable` instead of the host pretending the tool is installed.
 
 ## 6. Multi-runtime support (§38)
 
@@ -146,11 +161,11 @@ run console (§24).
    engine definitions. What is still missing is the last mile: the containerized engines have no
    pinned image digest, so they stay disabled-not-`:latest` until an operator pins one, and the web
    app deliberately does not offer them (a browser has no adapter — invariant N2).
-2. The `cli` / `python` adapters and their host binding exist
-   (`apps/runner/src/executors/engineAdapters.ts`, routed through the existing `ExecutionLayer`, so
-   an engine run is confined exactly like every other run). What is still missing is upstream of
-   them: the query executor does not yet dispatch a plan step through `AdapterRegistry`, and the
-   containerized engines have no pinned image digest (`13_SHERLOCK.md` §1.2).
+2. A plan step now reaches an `AdapterRegistry` — through `registryEngines()` for a host with
+   adapters, or `createQueueAdapter()` for one that queues the work. What is still missing is a
+   process that owns both halves: the browser has no adapter by design (N2) and the runner does not
+   execute plans, so today the wiring is exercised by tests. The containerized engines also still
+   have no pinned image digest (`13_SHERLOCK.md` §1.2).
 3. The external worker loop ships (`packages/transforms/src/remoteWorker.ts`) but no deployment
    does: nothing in the repo runs it on a second machine, and no HTTP transport is written, so §36
    is still exercised by tests rather than in production.

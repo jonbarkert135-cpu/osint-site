@@ -16,7 +16,13 @@ import { createDohResolver } from './doh-resolver.ts';
 import { createRdapLookup } from './rdap-lookup.ts';
 
 export { createCtLogSearch, createDohResolver, createRdapLookup };
-export { adapterEngines, createAmass, createSherlock, createSubfinder } from './cli-engines.ts';
+export {
+  adapterEngines,
+  createAmass,
+  createSherlock,
+  createSubfinder,
+  registryEngines,
+} from './cli-engines.ts';
 
 export const BUILTIN_ENGINES: Readonly<Record<EngineId, () => TransformEngine>> = {
   'doh-resolver': createDohResolver,
