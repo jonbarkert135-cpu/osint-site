@@ -17,9 +17,17 @@ export interface RunConsoleProps {
   readonly onToggle: () => void;
   /** Shown on the handle while the run is live. */
   readonly running?: boolean;
+  /** Offered only when the finished run actually kept raw engine output (§10). */
+  readonly onDownloadRaw?: () => void;
 }
 
-export function RunConsole({ lines, open, onToggle, running = false }: RunConsoleProps) {
+export function RunConsole({
+  lines,
+  open,
+  onToggle,
+  running = false,
+  onDownloadRaw,
+}: RunConsoleProps) {
   const bodyRef = useRef<HTMLDivElement>(null);
 
   // The interesting line is always the last one; follow it while the drawer is open.
@@ -43,6 +51,16 @@ export function RunConsole({ lines, open, onToggle, running = false }: RunConsol
         <span>Console</span>
         <span className="nx-muted">{running ? 'running' : `${String(lines.length)} line(s)`}</span>
       </button>
+      {onDownloadRaw === undefined ? null : (
+        <button
+          type="button"
+          className="nx-console-raw"
+          data-testid="ask-console-raw"
+          onClick={onDownloadRaw}
+        >
+          Download raw output
+        </button>
+      )}
       <div
         className="nx-console-body"
         id="nx-console-body"

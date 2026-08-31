@@ -335,6 +335,18 @@ describe('start()', () => {
     expect(queueClose).toHaveBeenCalled();
   });
 
+  it('registers the registry watcher queue and its schedule (Part 2 §7)', async () => {
+    workerCtor.mockClear();
+    queueAdd.mockClear();
+    await start();
+    expect(workerCtor.mock.calls[2]?.[0]).toBe('registry.watch');
+    await vi.waitFor(() => {
+      expect((queueAdd.mock.calls as unknown[][]).map((call) => call[0])).toEqual(
+        expect.arrayContaining(['release-watch', 'liveness-watch', 'license-watch']),
+      );
+    });
+  });
+
   it('enqueues a hydrate job with the §10 idempotency key', async () => {
     workerCtor.mockClear();
     queueAdd.mockClear();
@@ -351,7 +363,10 @@ describe('start()', () => {
       boardId: 'b1',
       userId: 'u1',
     });
-    expect(queueAdd.mock.lastCall).toMatchObject([
+    const hydrateCall = (queueAdd.mock.calls as unknown[][]).find(
+      (call) => call[0] === 'github.hydrate',
+    );
+    expect(hydrateCall).toMatchObject([
       'github.hydrate',
       { nodeId: 'n1' },
       { jobId: 'hydrate:n1:gh:repo:a/b', attempts: 4 },

@@ -25,7 +25,7 @@ Batch 1 = §1–§10, closed on **2026-08-24**.
 | 4   | Competitor audit                                 | `23_COMPETITOR_MATRIX.md` §8.1–§8.3                                                                                                          | **done** — 27 products checked against vendor pages on 2026-08-24                                                                 |
 | 5   | Competitor matrix + adopt/improve/reject/build   | `23` §3–§6 and §8.1, §8.3–§8.5                                                                                                               | **done**                                                                                                                          |
 | 6   | No obsolete projects, tiers A–E                  | `22` §1 (tier rules), §10.1 (tiers), `26` §3.2                                                                                               | **done** — rejection log now carries the 2026-08-24 demotions                                                                     |
-| 7   | Automated open-source discovery engine           | `26` §3 (pipeline) + **§5** (watchers, intake, scoring, refusals)                                                                            | **specified, not built** — the watcher jobs do not exist in `apps/worker` yet                                                     |
+| 7   | Automated open-source discovery engine           | `26` §3 (pipeline) + **§5** (watchers, intake, scoring, refusals)                                                                            | **built** — all six watchers run in `apps/worker/src/watchers/` on BullMQ schedules; intake and scoring remain manual             |
 | 8   | Every service is a module (adapter architecture) | `10_INTEGRATIONS.md` §3 (InputAdapter → Execution → Parser → Normalizer → EntityExtractor → RelationshipExtractor → graph), §8 (normalizers) | **specified and partly built** — two registered engines (`expand-url`, `github`)                                                  |
 | 9   | One unified query engine / query bar             | `24_UNIFIED_QUERY.md` §3, §10, §11                                                                                                           | **specified; UI partly built** — global search shipped (PR #51), the query bar over the engine is not                             |
 | 10  | Intelligent query planner                        | `24` §4 (router: 8 filter stages) and §5 (plan, stages, budget, approval)                                                                    | **specified, not executed end-to-end** — `QueryPlan` has no scheduler behind it                                                   |
@@ -37,9 +37,11 @@ items — each needs a roadmap entry, not another spec.
 
 1. **Query executor** (§9, §10). `QueryPlan` is fully specified and nothing runs it. Until the
    executor exists, the router, the budget model and the plan-review UI are theory.
-2. **Discovery watchers** (§7). Six read-only jobs (`release`, `liveness`, `licence`, `definition`,
-   `vuln`, `endpoint`) in `apps/worker` with a drift-finding record. Without them the registry
-   decays exactly the way SpiderFoot did, silently.
+2. **Discovery watchers** (§7). **Done** — all six shipped on 2026-08-31: `release-watch`,
+   `liveness-watch`, `license-watch`, `vuln-watch` (OSV), `definition-watch` and `endpoint-watch` in
+   `apps/worker/src/watchers/`, scheduled and writing dated drift findings. `endpoint-watch` hashes
+   the normalised vendor page rather than parsing prose: a changed hash is a `review` finding for a
+   human to read, and a page with no recorded baseline reports its hash as `unverified`.
 3. **More adapters** (§8). Two engines is not an ecosystem. The next ones follow the verified Tier-A
    list: subfinder, dnsx, httpx, Sherlock (already passported), then the free public APIs (RDAP,
    DoH, GLEIF, crt.sh) which need no credentials and no container.
@@ -175,15 +177,15 @@ make the number unfalsifiable. Marking a finding as evidence (§22) is the hones
 
 ## Batch: §27–§33 (2026-08-25)
 
-| §   | Requirement           | Where it now lives                                                      | State                            |
-| --- | --------------------- | ----------------------------------------------------------------------- | -------------------------------- |
-| 27  | Service health center | `packages/query-engine/src/health.ts` + `/system` → Health              | ✅ code                          |
-| 28  | Engine registry       | `/system` → Engines, read from engine/transform manifests               | ✅ code                          |
-| 29  | Failure isolation     | `runIsUsable()`, per-engine rows; invariant U5                          | ✅ code + test                   |
-| 30  | Retry system          | `applyAction()` + row menu (records intent, never executes — N5)        | ✅ code                          |
-| 31  | Timeout management    | `EngineLimits` / `DEFAULT_LIMITS`                                       | ⚠️ boundary only                 |
-| 32  | Resource manager      | `packages/query-engine/src/resources.ts` (fair share 60 %)              | ⚠️ boundary only                 |
-| 33  | Hidden Cloud          | `29_RUNTIME_ENVIRONMENT.md` §7 — VPS profile + `scripts/survey-host.sh` | ✅ resolved, capacity unmeasured |
+| §   | Requirement           | Where it now lives                                                         | State                            |
+| --- | --------------------- | -------------------------------------------------------------------------- | -------------------------------- |
+| 27  | Service health center | `packages/query-engine/src/health.ts` + `/system` → Health                 | ✅ code                          |
+| 28  | Engine registry       | `/system` → Engines, read from engine/transform manifests                  | ✅ code                          |
+| 29  | Failure isolation     | `runIsUsable()`, per-engine rows; invariant U5                             | ✅ code + test                   |
+| 30  | Retry system          | `applyAction()` + row menu (records intent, never executes — N5)           | ✅ code                          |
+| 31  | Timeout management    | `deadlineFor()` in the executor + the `executionMs` ceiling                | ✅ enforced per run              |
+| 32  | Resource manager      | `packages/query-engine/src/resources.ts`, wired as `ExecuteDeps.resources` | ✅ enforced per run              |
+| 33  | Hidden Cloud          | `29_RUNTIME_ENVIRONMENT.md` §7 — VPS profile + `scripts/survey-host.sh`    | ✅ resolved, capacity unmeasured |
 
 Design and the honest gap list: `29_RUNTIME_ENVIRONMENT.md`. §33 was closed on 2026-08-25 once the
 owner confirmed the target: a self-managed Linux VPS (Ubuntu LTS, x86_64, root, Docker Engine,
@@ -191,6 +193,13 @@ systemd, persistent disk, nginx + Let's Encrypt) rather than a PaaS. Containeriz
 therefore allowed with explicit per-container limits. What remains unverified is machine capacity —
 RAM, cores, disk, Docker version — which `scripts/survey-host.sh` answers when run on the host; the
 resource budget keeps its conservative defaults until that output is recorded.
+
+§31 and §32 stopped being boundary-only on 2026-08-31: the executor now asks the injected
+`ResourceManager` for a lease before every engine run (CPU and RAM from the engine passport,
+`executionMs` from the transform deadline) and releases it in a `finally`. A refusal is a
+`step.skipped` event with reason `over-capacity` plus the accountant's own message in the run
+warnings — the query still returns everything it already produced (U5). `apps/web` holds one
+manager per tab; a host that runs a single engine at a time omits the dependency.
 
 ## Batch: §34–§39 (2026-08-25)
 
@@ -200,13 +209,17 @@ resource budget keeps its conservative defaults until that output is recorded.
 | 35  | No forced fits        | `FALLBACK_STRATEGIES` on the passport, surfaced as "Alternative" | ✅ data, not folklore    |
 | 36  | Remote engine queue   | `packages/transforms/src/remote.ts`                              | ⚠️ queue only, no worker |
 | 37  | Engine abstraction    | `packages/transforms/src/adapters.ts` (`EngineAdapter`)          | ✅ core is runtime-blind |
-| 38  | Multi-runtime support | `ENGINE_RUNTIMES` + `ADAPTER_SUPPORT`                            | ⚠️ 3 of 8 implemented    |
+| 38  | Multi-runtime support | `ENGINE_RUNTIMES` + `ADAPTER_SUPPORT`                            | ⚠️ 5 of 8 implemented    |
 | 39  | Engine manifest       | `EngineRuntimeSchema`, `resolveRuntime()`                        | ✅ validated, derivable  |
 
-Design and gaps: `30_ENGINE_RUNTIME_ARCHITECTURE.md`. Two honest limits: the cli/python adapters do
-not exist yet, so the three containerized engines (amass, sherlock, subfinder) are classified and
-limited but not runnable; and no external worker ships with the repo, so §36 is exercised by tests
-rather than in production.
+Design and gaps: `30_ENGINE_RUNTIME_ARCHITECTURE.md`. The cli/python adapters
+(`packages/transforms/src/cliAdapter.ts`) and their host binding
+(`apps/runner/src/executors/engineAdapters.ts`) shipped on 2026-08-31: an engine run now goes
+through the same sandbox, egress proxy, limits and artifact collection as every other run. `sdk/adapterEngine.ts` then joins an adapter to the executor's `TransformEngine` contract, and
+`sdk/engines/cli-engines.ts` ships subfinder, amass and sherlock on top of it, which moves §8
+("every service is a module") from two engines to five. Two honest limits remain: the containerized
+engines still need a pinned image digest before a host may run them, and no external worker ships
+with the repo, so §36 is exercised by tests rather than in production.
 
 ## Batch: §39–§41 (2026-08-31)
 
