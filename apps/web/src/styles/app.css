@@ -1613,6 +1613,70 @@
     text-decoration: line-through;
   }
 
+  /* Live counters (Part 2 §52): the run's tally, updated as results arrive. */
+  .nx-ask-counters {
+    list-style: none;
+    margin: var(--space-3, 12px) 0 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2, 8px);
+    font-size: var(--text-body-sm, 13px);
+    color: var(--nx-text-muted, rgb(255 255 255 / 60%));
+  }
+
+  /* Execution view (Part 2 §53): the pipeline as a text tree. */
+  .nx-exec-list {
+    list-style: none;
+    margin: var(--space-2, 8px) 0 0;
+    padding: 0;
+    font-family: var(--nx-font-mono, ui-monospace, monospace);
+    font-size: var(--text-body-sm, 13px);
+  }
+
+  .nx-exec-row {
+    display: flex;
+    gap: var(--space-2, 8px);
+    align-items: baseline;
+    padding-block: 2px;
+  }
+
+  .nx-exec-prefix {
+    color: var(--nx-text-muted, rgb(255 255 255 / 40%));
+  }
+
+  .nx-exec-row[data-state='pending'] .nx-exec-label {
+    color: var(--nx-text-muted, rgb(255 255 255 / 45%));
+  }
+
+  .nx-exec-row[data-state='failed'] .nx-exec-label {
+    color: var(--nx-danger, #ff6b6b);
+  }
+
+  /* Unified activity log (Part 2 §54) and the integrations catalogue (§55). */
+  .nx-activity {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-2, 8px);
+    font-size: var(--text-body-sm, 13px);
+  }
+
+  .nx-activity li {
+    display: flex;
+    gap: var(--space-2, 8px);
+    align-items: baseline;
+    flex-wrap: wrap;
+  }
+
+  .nx-activity-kind {
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: var(--text-body-xs, 11px);
+    color: var(--nx-text-muted, rgb(255 255 255 / 60%));
+  }
+
   /* Results and duplicate hints (Part 2 §17, §19): the raw source stays one click away. */
   .nx-ask-results,
   .nx-ask-dupes {

@@ -406,3 +406,56 @@ the deployment's business, not this module's.
 Still open, and stated rather than hidden: nothing _asks_ the runner for a plan yet — there is no
 queue message for it, so the host is entered from tests or from an embedder. The browser keeps the
 builtin-only library on purpose (N2). Containerized engines still need pinned image digests.
+
+## Batch: §51–§56 (2026-08-31)
+
+| §   | Point                | Where                                    | State                            |
+| --- | -------------------- | ---------------------------------------- | -------------------------------- |
+| 51  | Engine result cache  | `packages/transforms/src/cache.ts`       | ✅ record + version invalidation |
+| 52  | Live update          | `liveCounters()` in `useQueryRun.ts`     | ✅ counters during the run       |
+| 53  | Execution view       | `apps/web/src/query/ExecutionView.tsx`   | ✅ pipeline tree                 |
+| 54  | Unified activity log | `apps/web/src/system/activityLog.ts`     | ✅ session-scoped                |
+| 55  | Engine catalogue     | `packages/query-engine/src/catalog.ts`   | ✅ five states + tab             |
+| 56  | Tool discovery       | `packages/query-engine/src/discovery.ts` | ⚠️ logic only, no scanner wired  |
+
+**§51.** The cache already keyed on `transform+version | engine+version | provider | input`, so a new
+engine version has always _missed_. What it did not do is remember what it was holding: an entry now
+records the query, the input, the engine and its version, the provider, the timestamp and the expiry,
+which makes a cached answer auditable and lets `invalidateEngineVersion(engine, version)` drop the
+superseded entries instead of leaving them to age out. The query is recorded, never keyed — two
+different questions that reach the same transform on the same input share the answer, as they should.
+Storage stays in memory (ADR-001): a durable cache is the repository's job.
+
+**§52.** The dashboard counted after the run; the tally now exists during it. `reduceEvent` keeps a
+per-kind count and a relationship count as `entity.found` / `relation.found` stream in, and
+`liveCounters()` renders "12 entities found · 3 repos found · 42 relationships discovered" from the
+same events the finished dashboard counts — so the live number and the final number cannot disagree.
+
+**§53.** _Execution View_ (a toggle in Ask Raven) draws the run as the pipeline it is: query →
+planner → engines in parallel → aggregator → entity resolver → graph. It is a text tree with a state
+mark per node, not a canvas: the shape is fixed, and a tree stays readable at twenty engines. Node
+states are derived (`executionView.ts`) — a stage the run has not reached is `pending`, never an
+optimistic tick — and the downstream stages only start once every engine has settled.
+
+**§54.** One session history — queries, engine runs, entities, connections, errors, imports, exports —
+fed from the run stream (`recordQueryEvent`) plus the import and export call sites, filterable by kind
+on _System → Activity_. Deliberately not persisted, like `runtimeStore`: a log that survives a reload
+belongs in `@nexus/db`, and a persisted-looking log that silently forgets is worse than none. The one
+kind nothing writes yet is `ai`: the AI panel has its own review flow and was left alone this batch.
+
+**§55.** `integrationCatalog()` puts every engine in exactly one of five states — installed,
+recommended, available, deprecated, incompatible — with the reason in words and the action the row
+offers (open / install / replace / none). Deprecated and incompatible are kept apart on purpose:
+one means "do not start using this", the other means "no button will fix this host". There is no
+marketplace, as §55 allows; the extension point is the input, which is a list of `EngineDocument`s,
+so a remote index is one more source concatenated with the local registry's.
+
+**§56.** `discoverTools()` judges candidates (new repositories, releases, alternatives) against the
+catalogue: a newer release of an installed engine is an `update`, something covering a capability
+whose engine is deprecated or incompatible is an `alternative` ("a supported alternative to X was
+found"), an uncovered capability is a `new-tool`, and anything already covered by a working engine is
+silence. Ignored ids never come back, and a candidate whose runtime this build has no adapter for is
+offered as Review/Ignore without an Install it could not honour. **Honest gap:** nothing fetches
+candidates — no release feed, no registry crawl, no model — so the Discovered section reads "no tool
+scan has run in this build yet" rather than showing invented finds, and Install is disabled because
+the app has no package fetcher (the §40 install pipeline judges manifests, it does not download them).

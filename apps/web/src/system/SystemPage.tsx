@@ -26,9 +26,12 @@ import {
   type EngineManifest,
   type TransformRegistry,
 } from '@nexus/transforms';
+import { BUILTIN_ENGINES } from '@nexus/transforms';
 import { Button, Menu, MenuItem } from '@nexus/ui';
 import { useMemo, useState } from 'react';
 
+import { ActivityLog } from './ActivityLog.tsx';
+import { IntegrationsCatalog } from './IntegrationsCatalog.tsx';
 import { policyFor, requestAction, useRuntime } from './runtimeStore.ts';
 
 const ACTIONS: readonly { readonly id: EngineAction; readonly label: string }[] = [
@@ -182,7 +185,11 @@ function HealthRow({
 export default function SystemPage() {
   const registry = useMemo(() => createCatalogRegistry(), []);
   const runtime = useRuntime();
-  const [tab, setTab] = useState<'health' | 'engines' | 'runtime'>('health');
+  const [tab, setTab] = useState<'health' | 'engines' | 'runtime' | 'integrations' | 'activity'>(
+    'health',
+  );
+  /** "Installed" means an adapter is registered in this build, not that a manifest exists (§55). */
+  const installed = useMemo(() => new Set(Object.keys(BUILTIN_ENGINES)), []);
 
   const engines = useMemo(
     () => [...registry.engines].sort((a, b) => a.id.localeCompare(b.id)),
@@ -241,6 +248,28 @@ export default function SystemPage() {
           >
             Runtime
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'integrations'}
+            className="nx-tab"
+            onClick={() => {
+              setTab('integrations');
+            }}
+          >
+            Integrations
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'activity'}
+            className="nx-tab"
+            onClick={() => {
+              setTab('activity');
+            }}
+          >
+            Activity
+          </button>
         </div>
       </header>
 
@@ -251,7 +280,11 @@ export default function SystemPage() {
         </p>
       ) : null}
 
-      {tab === 'runtime' ? (
+      {tab === 'integrations' ? (
+        <IntegrationsCatalog installed={installed} />
+      ) : tab === 'activity' ? (
+        <ActivityLog />
+      ) : tab === 'runtime' ? (
         <div className="nx-stack nx-compat" data-testid="system-compat">
           <p className="nx-system-note">
             Host profile: self-managed Linux VPS with Docker (RAVEN-SPEC/29 §7). Engines that do not

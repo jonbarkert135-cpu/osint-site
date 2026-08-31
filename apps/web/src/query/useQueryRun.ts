@@ -26,6 +26,7 @@ import {
 } from '@nexus/transforms';
 import { useCallback, useMemo, useRef, useState } from 'react';
 
+import { logActivity, recordQueryEvent } from '../system/activityLog.ts';
 import { recordRuns } from '../system/runtimeStore.ts';
 import { createBrowserHostFetch } from './hostFetch.ts';
 import { keepRawOutput } from './rawOutput.ts';
@@ -65,6 +66,9 @@ export interface QueryRunState {
   /** How many steps are executing right now — the visible proof of parallel execution. */
   readonly inFlight: number;
   readonly found: number;
+  /** Live tally per entity kind — the "3 repositories found" line while the run is still going (§52). */
+  readonly counts: Readonly<Record<string, number>>;
+  readonly relations: number;
   readonly result: InvestigationResult | null;
   readonly error: string | null;
   /** Newest last; capped, because a long run must not grow the tab without bound. */
@@ -91,6 +95,8 @@ const EMPTY: QueryRunState = {
   progress: 0,
   inFlight: 0,
   found: 0,
+  counts: {},
+  relations: 0,
   result: null,
   error: null,
   log: [],
@@ -187,6 +193,10 @@ export function reduceEvent(state: QueryRunState, event: QueryEvent): QueryRunSt
       return {
         ...state,
         found: state.found + 1,
+        counts: {
+          ...state.counts,
+          [event.entity.kind]: (state.counts[event.entity.kind] ?? 0) + 1,
+        },
         log: say(
           state,
           'good',
@@ -196,6 +206,7 @@ export function reduceEvent(state: QueryRunState, event: QueryEvent): QueryRunSt
     case 'relation.found':
       return {
         ...state,
+        relations: state.relations + 1,
         log: say(
           state,
           'good',
@@ -235,6 +246,27 @@ export function reduceEvent(state: QueryRunState, event: QueryEvent): QueryRunSt
       return state;
   }
 }
+
+/**
+ * The live dashboard lines (Part 2 §52): "12 entities found · 3 repositories found". Derived from
+ * the running tally, so they appear while the run is going instead of after it — and they are the
+ * same numbers the finished dashboard shows, because both count the same events.
+ */
+export const liveCounters = (state: QueryRunState): readonly string[] => {
+  if (state.found === 0 && state.relations === 0) return [];
+  const kinds = Object.entries(state.counts)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([kind, count]) => `${String(count)} ${kind}${count === 1 ? '' : 's'} found`);
+  return [
+    `${String(state.found)} ${state.found === 1 ? 'entity' : 'entities'} found`,
+    ...kinds,
+    ...(state.relations > 0
+      ? [
+          `${String(state.relations)} ${state.relations === 1 ? 'relationship' : 'relationships'} discovered`,
+        ]
+      : []),
+  ];
+};
 
 export interface UseQueryRunOptions {
   readonly mode?: ExecutionMode;
@@ -309,18 +341,19 @@ export function useQueryRun(options: UseQueryRunOptions = {}): QueryRunControlle
             return;
           }
           const event = step.value;
+          // §54: the session-wide history is fed from the same stream the panel renders.
+          recordQueryEvent(event);
           setState((current) => reduceEvent(current, event));
         }
       } catch (cause) {
-        setState((current) => {
-          const message = cause instanceof Error ? cause.message : 'The run failed.';
-          return {
-            ...current,
-            phase: 'failed',
-            error: message,
-            log: say(current, 'error', message),
-          };
-        });
+        const message = cause instanceof Error ? cause.message : 'The run failed.';
+        logActivity('error', message);
+        setState((current) => ({
+          ...current,
+          phase: 'failed',
+          error: message,
+          log: say(current, 'error', message),
+        }));
       }
     },
     [registry, engines, cache, options.fetch, options.mode],

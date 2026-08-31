@@ -1,7 +1,7 @@
 import type { QueryEvent } from '@nexus/query-engine';
 import { describe, expect, it } from 'vitest';
 
-import { reduceEvent } from './useQueryRun.ts';
+import { liveCounters, reduceEvent } from './useQueryRun.ts';
 
 const step = { transform: 'domain.certificates', stage: 0, input: { kind: 'domain', value: 'a' } };
 
@@ -11,6 +11,8 @@ const base = {
   progress: 0,
   inFlight: 0,
   found: 0,
+  counts: {},
+  relations: 0,
   result: null,
   error: null,
   log: [],
@@ -31,6 +33,34 @@ describe('reduceEvent', () => {
       entity: { kind: 'host', value: 'a.example.com', confidence: 0.8 },
     } as unknown as QueryEvent;
     expect(fold([found, found, found]).found).toBe(3);
+  });
+
+  it('tallies entities by kind and relationships for the live counters (§52)', () => {
+    const entity = (kind: string): QueryEvent =>
+      ({
+        type: 'entity.found',
+        step,
+        entity: { kind, value: `${kind}.example.com`, confidence: 0.8 },
+      }) as unknown as QueryEvent;
+    const link = {
+      type: 'relation.found',
+      step,
+      relation: { kind: 'resolves-to', derived: false, confidence: 0.9 },
+    } as unknown as QueryEvent;
+    const state = fold([entity('hostname'), entity('hostname'), entity('repo'), link]);
+
+    expect(state.counts).toEqual({ hostname: 2, repo: 1 });
+    expect(state.relations).toBe(1);
+    expect(liveCounters(state)).toEqual([
+      '3 entities found',
+      '2 hostnames found',
+      '1 repo found',
+      '1 relationship discovered',
+    ]);
+  });
+
+  it('has no live counters before anything is found', () => {
+    expect(liveCounters(base)).toEqual([]);
   });
 
   it('replaces a step row instead of appending a second one', () => {

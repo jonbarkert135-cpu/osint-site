@@ -314,7 +314,14 @@ export async function* executePlan(
       emit({ type: 'step.started', step: ref, engine: engineId });
       const runId = nextRunId();
       const runInput = { kind: input.kind, value: canonicalValue(input.kind, input.value) };
-      const subject = { transform, engine: manifest, provider, input: runInput };
+      // The question is recorded with the cached answer (Part 2 §51); it is not part of the key.
+      const subject = {
+        transform,
+        engine: manifest,
+        provider,
+        input: runInput,
+        query: query.input,
+      };
       const startedStep = now();
 
       const hit = deps.cache?.get(subject, startedStep);

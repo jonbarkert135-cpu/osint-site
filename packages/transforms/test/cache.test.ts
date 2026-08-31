@@ -82,6 +82,34 @@ describe('createResultCache', () => {
     expect(cache.size).toBe(0);
   });
 
+  it('records what §51 asks for: query, input, engine version, timestamps', () => {
+    const cache = createResultCache();
+    cache.set({ ...subject, query: 'example.com' }, results, 'r1', 1_000);
+    const [entry] = cache.entries();
+    expect(entry).toMatchObject({
+      query: 'example.com',
+      input: { kind: 'domain', value: 'Example.COM ' },
+      transform: 'domain-to-ip',
+      engine: 'strong',
+      engineVersion: '1.0.0',
+      provider: 'free',
+      storedAt: 1_000,
+      expiresAt: 61_000,
+    });
+  });
+
+  it('invalidates entries left behind by an older engine version', () => {
+    const cache = createResultCache();
+    cache.set(subject, results, 'r1', 0);
+    expect(cache.invalidateEngineVersion('strong', '2.0.0')).toBe(1);
+    expect(cache.size).toBe(0);
+    // A different engine, and the current version, are left alone.
+    cache.set(subject, results, 'r2', 0);
+    expect(cache.invalidateEngineVersion('other', '9.9.9')).toBe(0);
+    expect(cache.invalidateEngineVersion('strong', '1.0.0')).toBe(0);
+    expect(cache.size).toBe(1);
+  });
+
   it('deletes an entry on demand', () => {
     const cache = createResultCache();
     cache.set(subject, results, 'r1', 0);
