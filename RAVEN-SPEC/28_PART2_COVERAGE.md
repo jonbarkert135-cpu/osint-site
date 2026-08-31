@@ -388,3 +388,21 @@ never a pretend capability (U5).
 Honest gaps unchanged: no process owns both an adapter registry and the plan executor yet (the
 browser has no adapter by design, the runner does not execute plans), there is no HTTP transport or
 worker deployment, and containerized engines still need pinned image digests.
+
+## Batch: §37 host wiring (2026-08-31)
+
+| §   | Point                    | Where                     | State                       |
+| --- | ------------------------ | ------------------------- | --------------------------- |
+| 37  | One process, both halves | `apps/runner/src/plan.ts` | ✅ registry + plan executor |
+
+`createHostAdapters()` registers the runner's cli/python/go/rust adapters, `createHostEngines()`
+merges `BUILTIN_ENGINES` with whatever `registryEngines()` says this host can dispatch, and
+`runHostPlan()` drains `executePlan` and returns the investigation. That closes the gap the last two
+batches kept naming: the adapter registry and the plan executor now live in the same process, and a
+subfinder step in a plan really does reach the runner's `ExecutionLayer` — one confinement, no second
+process door (N5). The network stays injected (`fetch`), because routing through the egress proxy is
+the deployment's business, not this module's.
+
+Still open, and stated rather than hidden: nothing _asks_ the runner for a plan yet — there is no
+queue message for it, so the host is entered from tests or from an embedder. The browser keeps the
+builtin-only library on purpose (N2). Containerized engines still need pinned image digests.
