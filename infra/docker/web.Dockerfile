@@ -28,7 +28,11 @@ RUN pnpm --filter @nexus/ui run build && pnpm --filter @nexus/web run build
 FROM caddy:2-alpine AS runtime
 # Pick up the Alpine security updates published after the base image was built (Trivy gates the
 # image on HIGH/CRITICAL; 15_SECURITY.md §9.4).
-RUN apk upgrade --no-cache
+# The trailing date is part of the command string on purpose: the CI docker cache (`type=gha`)
+# would otherwise replay this layer with the package set of an earlier build, which is exactly how
+# libcrypto3/libssl3 3.5.7-r0 (CVE-2026-14456) survived a run that already ran `apk upgrade`.
+# Bump the date whenever Trivy reports a fixable Alpine package.
+RUN apk upgrade --no-cache # package index refreshed 2026-08-31
 COPY --from=build --chown=65532:65532 /repo/apps/web/dist /srv
 COPY infra/docker/web.Caddyfile /etc/caddy/Caddyfile
 USER 65532:65532
