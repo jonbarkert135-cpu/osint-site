@@ -126,12 +126,16 @@ run console (§24).
 
 ## 7. Gaps
 
-1. The `cli` / `python` adapters and their host binding exist
+1. Adapter-backed engines (`packages/transforms/src/sdk/adapterEngine.ts`) join the adapters to the
+   executor, and `sdk/engines/cli-engines.ts` ships subfinder, amass and sherlock as data-thin
+   engine definitions. What is still missing is the last mile: the containerized engines have no
+   pinned image digest, so they stay disabled-not-`:latest` until an operator pins one, and the web
+   app deliberately does not offer them (a browser has no adapter — invariant N2).
+2. The `cli` / `python` adapters and their host binding exist
    (`apps/runner/src/executors/engineAdapters.ts`, routed through the existing `ExecutionLayer`, so
    an engine run is confined exactly like every other run). What is still missing is upstream of
    them: the query executor does not yet dispatch a plan step through `AdapterRegistry`, and the
-   containerized engines have no pinned image digest, so amass/subfinder remain disabled-not-latest
-   (`13_SHERLOCK.md` §1.2 rule) until an operator pins one.
-2. No external worker implementation ships with the repo; the queue is exercised by tests only.
-3. Footprints for derived passports are conservative defaults, not measurements. Real numbers come
+   containerized engines have no pinned image digest (`13_SHERLOCK.md` §1.2).
+3. No external worker implementation ships with the repo; the queue is exercised by tests only.
+4. Footprints for derived passports are conservative defaults, not measurements. Real numbers come
    from running the engines under the resource manager (`29` §6) and recording what they use.

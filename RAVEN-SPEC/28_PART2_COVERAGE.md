@@ -206,7 +206,8 @@ resource budget keeps its conservative defaults until that output is recorded.
 Design and gaps: `30_ENGINE_RUNTIME_ARCHITECTURE.md`. The cli/python adapters
 (`packages/transforms/src/cliAdapter.ts`) and their host binding
 (`apps/runner/src/executors/engineAdapters.ts`) shipped on 2026-08-31: an engine run now goes
-through the same sandbox, egress proxy, limits and artifact collection as every other run. Two
-honest limits remain: the query executor still does not dispatch plan steps through the
-`AdapterRegistry`, and no external worker ships with the repo, so §36 is exercised by tests rather
-than in production.
+through the same sandbox, egress proxy, limits and artifact collection as every other run. `sdk/adapterEngine.ts` then joins an adapter to the executor's `TransformEngine` contract, and
+`sdk/engines/cli-engines.ts` ships subfinder, amass and sherlock on top of it, which moves §8
+("every service is a module") from two engines to five. Two honest limits remain: the containerized
+engines still need a pinned image digest before a host may run them, and no external worker ships
+with the repo, so §36 is exercised by tests rather than in production.
