@@ -112,3 +112,22 @@ describe('shipped adapter-backed engines', () => {
     ]);
   });
 });
+
+describe('subfinder and amass', () => {
+  const hostAdapter = createCliAdapter({
+    run: async () => ({ code: 0, stdout: '{"host":"a.example.com"}' }),
+  });
+
+  it.each(['subfinder', 'amass'])('%s proposes hostnames for a domain', async (id) => {
+    const outcome = await runEngine(adapterEngines(hostAdapter)[id]?.() as never, {
+      input: { kind: 'domain', value: 'example.com' },
+      mode: 'configured',
+      deadlineMs: 5_000,
+      maxResults: 100,
+      fetch: async () => ({ status: 200, body: null }),
+    });
+    expect(outcome.entities).toEqual([
+      expect.objectContaining({ kind: 'hostname', value: 'a.example.com' }),
+    ]);
+  });
+});

@@ -14,6 +14,14 @@ import {
   vulnWatch,
 } from '../src/watchers/checks.ts';
 import { appendFindings, findingsFile } from '../src/watchers/store.ts';
+import {
+  githubGet,
+  jsonFetch,
+  processWatcherJob,
+  registerWatcherSchedule,
+  textFetch,
+  WATCHER_SCHEDULE,
+} from '../src/watchers/queue.ts';
 import { WATCHED_ENGINES, type WatchedEngine } from '../src/watchers/watched.ts';
 
 const engine: WatchedEngine = {
@@ -219,5 +227,70 @@ describe('endpoint-watch (§7)', () => {
   it('does not pretend to check GitHub for a vendor row', async () => {
     const findings = await runWatcher('release-watch', [vendor(baseline)], pages(page));
     expect(findings[0]).toMatchObject({ status: 'unverified' });
+  });
+});
+
+describe('watcher queue plumbing', () => {
+  const withFetch = async <T>(stub: typeof fetch, body: () => Promise<T>): Promise<T> => {
+    const original = globalThis.fetch;
+    globalThis.fetch = stub;
+    try {
+      return await body();
+    } finally {
+      globalThis.fetch = original;
+    }
+  };
+
+  it('reads JSON, advisories and page text, and treats any error as "could not verify"', async () => {
+    const ok = (async () => ({
+      ok: true,
+      json: async () => ({ tag_name: 'v1' }),
+      text: async () => 'page',
+    })) as unknown as typeof fetch;
+    const bad = (async () => ({
+      ok: false,
+      json: async () => ({}),
+      text: async () => '',
+    })) as unknown as typeof fetch;
+    const boom = (async () => {
+      throw new Error('offline');
+    }) as unknown as typeof fetch;
+
+    await withFetch(ok, async () => {
+      expect(await githubGet('/repos/a/b/releases/latest')).toEqual({ tag_name: 'v1' });
+      expect(
+        await jsonFetch('https://api.osv.dev/v1/query', { method: 'POST', body: '{}' }),
+      ).toEqual({ tag_name: 'v1' });
+      expect(await textFetch('https://example.com')).toBe('page');
+    });
+    await withFetch(bad, async () => {
+      expect(await githubGet('/x')).toBeUndefined();
+      expect(await jsonFetch('https://example.com')).toBeUndefined();
+      expect(await textFetch('https://example.com')).toBeUndefined();
+    });
+    await withFetch(boom, async () => {
+      expect(await githubGet('/x')).toBeUndefined();
+      expect(await jsonFetch('https://example.com')).toBeUndefined();
+      expect(await textFetch('https://example.com')).toBeUndefined();
+    });
+  });
+
+  it('writes the findings of a run and registers one repeatable job per watcher', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'raven-queue-'));
+    const findings = await processWatcherJob(
+      'release-watch',
+      { github: async () => undefined, now },
+      { dir },
+    );
+    expect(findings.length).toBeGreaterThan(0);
+    expect(await readFile(findingsFile(now(), dir), 'utf8')).toContain('release-watch');
+
+    const added: string[] = [];
+    await registerWatcherSchedule({
+      add: async (name: string) => {
+        added.push(name);
+      },
+    } as never);
+    expect(added.sort()).toEqual(Object.keys(WATCHER_SCHEDULE).sort());
   });
 });
