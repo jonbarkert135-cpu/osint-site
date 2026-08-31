@@ -287,3 +287,58 @@ board is the next batch), and there is no SpiderFoot engine in the catalogue —
 spec, not code — so the brief's SpiderFoot slot in `WORKFLOW_TEMPLATES` is filled by the shipped
 broad-sweep transform (`selector-to-web-mentions`) and swaps to `spiderfoot` in one line the day
 that engine lands.
+
+## Batch: §45–§50 (2026-08-31)
+
+| §   | Point                  | Where                                                                          | State                               |
+| --- | ---------------------- | ------------------------------------------------------------------------------ | ----------------------------------- |
+| 45  | Visual workflow editor | `packages/query-engine/src/builder.ts`, `apps/web/src/query/WorkflowPanel.tsx` | ✅ canvas model + panel             |
+| 46  | Research automation    | `runWorkflow()`, `apps/web/src/query/workflowStore.ts`                         | ✅ save, list, re-run for new input |
+| 47  | Research agent         | `packages/query-engine/src/agent.ts` (`runAgent`)                              | ⚠️ engine-side, no model wired      |
+| 48  | Agent boundaries       | `AgentGuardrails` + enforcement in `agent.ts`                                  | ✅ 8 limits, approval default no    |
+| 49  | Agent loop             | `runAgent()` rounds: observe→plan→execute→collect→evaluate→decide              | ✅ stops on `no-new-value`          |
+| 50  | Context memory         | `AgentMemory` (`createAgentMemory`)                                            | ✅ seeded from the board            |
+
+Design and boundaries: `31_RESEARCH_AGENT.md`.
+
+**§45.** The editor is the canvas, not a second graph engine: `layoutWorkflow()` positions a saved
+workflow (rank = longest path from the input, so a step never sits left of what it consumes and
+sibling branches share a column) and `graphToWorkflow()` compiles the drawing back. That inverse owns
+exactly one decision the drawing forces — an `EditorGraph` is unordered while a `Workflow` is
+declaration-ordered — so it topologically sorts and reports a cycle _as a cycle_ instead of leaking
+§44's "upstream node must be declared earlier". Unknown transforms and illegal stage order stay
+`validateWorkflow`'s job: one rule set, not two. The panel (palette: _Workflows…_) draws nodes as
+buttons with an SVG arrow layer that is transparent to the pointer, and adds/removes steps by id.
+
+**§46.** Saved workflows live in the browser (local-first, N2), upserted by id, each entry re-parsed
+through `deserializeWorkflow` so a corrupted record is dropped rather than half-loaded. `runWorkflow()`
+compiles a saved pipeline for a _new_ input and returns the ordinary `QueryPlan`, so re-running
+inherits scheduling, budgets, the §42 cost gate, provenance and proposal review unchanged. New in the
+model: the input node may pin the entity kind it was built for, and a mismatched re-run is refused —
+a username pipeline pointed at `example.com` says so instead of running Sherlock on a domain. The pin
+survives the canvas round trip (it is carried on the editor node, not only in the saved file).
+
+**§47–§50.** `runAgent()` is the orchestrator: registry (engines + capabilities), memory (results so
+far + the current graph), guardrails (budget, permissions) in; decisions out. Two structural choices
+carry the safety. Execution is **injected** — the agent decides, `executePlan` runs — so it cannot
+route around the host-proxied fetch, the cost gate or the resource manager, and the loop is testable
+with no network. And a model may **narrow, never widen**: the `brain` hook is handed the candidate
+steps the planner already allowed and returns a subset; invented ids are dropped and recorded as
+`brain-declined`, so a hallucinating model costs speed, not safety — and with no model configured the
+agent still works (the keyless constraint in `14_AI_AGENT.md`).
+
+Guardrails are enforced in code, never in a prompt: depth (2), jobs (12), wall clock (120 s), resource
+budget and optional cost ceiling, breadth per hop (4), approval above 100 new nodes or on any stored
+credential, and the permission boundary already carried by `PlannerContext`. Approval is asked once per
+round and **the default answer is no**: with no `approve` handler the session ends `awaiting-approval`
+having run nothing it had to ask about. Parallelism has two axes — tasks within a round run together
+(independent by construction), the DAG scheduler parallelizes inside a task — and rounds are the only
+sequential axis. Stops are explicit and explained: `no-new-value`, `max-depth`, `max-jobs`, `timeout`,
+`nothing-to-do`, `awaiting-approval`; `no-new-value` is a measurement, not a guess, because §50's
+memory (entities known + `transform@input` pairs already run, seeded from the board) is what decides
+whether a result is new. Each round also emits a one-line headline for the activity feed, which is the
+§47 "what to show the user" requirement.
+
+Honest gaps: no model is wired to `brain` yet, the agent has no UI of its own (a session view with
+rounds, skips and approval prompts is next), approval is per transform per round with no "always
+allow", and frontier selection is confidence-ordered rather than model-ranked.

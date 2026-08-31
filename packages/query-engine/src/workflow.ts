@@ -24,6 +24,7 @@ import {
   costProfile,
   costVerdict,
   routeTransform,
+  type EntityKind,
   type PlanExclusion,
   type PlanStep,
   type PlannerContext,
@@ -50,6 +51,11 @@ export interface WorkflowNode {
   readonly stage: WorkflowStage;
   /** Required for `transform` nodes, forbidden everywhere else. */
   readonly transform?: TransformId;
+  /**
+   * Only for the `input` node: the entity kind this pipeline was designed for (§46). A re-run with
+   * an input that types as something else is refused rather than coerced.
+   */
+  readonly kind?: EntityKind;
   readonly label?: string;
   /** Node ids this one consumes; empty for the input node. */
   readonly after: readonly string[];
@@ -101,6 +107,14 @@ export const validateWorkflow = (
       issues.push({ node: node.id, message: `a ${node.stage} node cannot name a transform` });
     }
 
+    const pinned = node.kind;
+    if (pinned !== undefined) {
+      if (node.stage !== 'input') {
+        issues.push({ node: node.id, message: 'only the input node may pin an entity kind' });
+      } else if (!registry.transforms.some((manifest) => manifest.inputs.includes(pinned))) {
+        issues.push({ node: node.id, message: `no transform accepts a ${pinned}` });
+      }
+    }
     if (node.stage === 'input' && node.after.length > 0) {
       issues.push({ node: node.id, message: 'the input node cannot depend on anything' });
     }
@@ -288,6 +302,7 @@ export const parseWorkflow = (value: unknown): ParsedWorkflow => {
         id: raw.id,
         stage: raw.stage,
         ...(typeof raw.transform === 'string' ? { transform: raw.transform } : {}),
+        ...(typeof raw.kind === 'string' ? { kind: raw.kind as EntityKind } : {}),
         ...(typeof raw.label === 'string' ? { label: raw.label } : {}),
         after,
       });
@@ -323,7 +338,7 @@ export const WORKFLOW_TEMPLATES: readonly Workflow[] = [
     description:
       'The Part 2 §44 pipeline: normalize a handle, sweep profiles and mentions, pull repositories, resolve entities, build the graph, summarize.',
     nodes: [
-      { id: 'input', stage: 'input', label: 'Username', after: [] },
+      { id: 'input', stage: 'input', kind: 'username', label: 'Username', after: [] },
       { id: 'normalize', stage: 'normalize', label: 'Normalize', after: ['input'] },
       {
         id: 'profiles',
