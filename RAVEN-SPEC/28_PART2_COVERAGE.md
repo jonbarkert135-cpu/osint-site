@@ -25,7 +25,7 @@ Batch 1 = §1–§10, closed on **2026-08-24**.
 | 4   | Competitor audit                                 | `23_COMPETITOR_MATRIX.md` §8.1–§8.3                                                                                                          | **done** — 27 products checked against vendor pages on 2026-08-24                                                                 |
 | 5   | Competitor matrix + adopt/improve/reject/build   | `23` §3–§6 and §8.1, §8.3–§8.5                                                                                                               | **done**                                                                                                                          |
 | 6   | No obsolete projects, tiers A–E                  | `22` §1 (tier rules), §10.1 (tiers), `26` §3.2                                                                                               | **done** — rejection log now carries the 2026-08-24 demotions                                                                     |
-| 7   | Automated open-source discovery engine           | `26` §3 (pipeline) + **§5** (watchers, intake, scoring, refusals)                                                                            | **specified, not built** — the watcher jobs do not exist in `apps/worker` yet                                                     |
+| 7   | Automated open-source discovery engine           | `26` §3 (pipeline) + **§5** (watchers, intake, scoring, refusals)                                                                            | **built** — all six watchers run in `apps/worker/src/watchers/` on BullMQ schedules; intake and scoring remain manual             |
 | 8   | Every service is a module (adapter architecture) | `10_INTEGRATIONS.md` §3 (InputAdapter → Execution → Parser → Normalizer → EntityExtractor → RelationshipExtractor → graph), §8 (normalizers) | **specified and partly built** — two registered engines (`expand-url`, `github`)                                                  |
 | 9   | One unified query engine / query bar             | `24_UNIFIED_QUERY.md` §3, §10, §11                                                                                                           | **specified; UI partly built** — global search shipped (PR #51), the query bar over the engine is not                             |
 | 10  | Intelligent query planner                        | `24` §4 (router: 8 filter stages) and §5 (plan, stages, budget, approval)                                                                    | **specified, not executed end-to-end** — `QueryPlan` has no scheduler behind it                                                   |
@@ -37,11 +37,11 @@ items — each needs a roadmap entry, not another spec.
 
 1. **Query executor** (§9, §10). `QueryPlan` is fully specified and nothing runs it. Until the
    executor exists, the router, the budget model and the plan-review UI are theory.
-2. **Discovery watchers** (§7). Five of six shipped on 2026-08-31 — `release-watch`,
-   `liveness-watch`, `license-watch`, `vuln-watch` (OSV) and `definition-watch` in
-   `apps/worker/src/watchers/`, scheduled and writing dated drift findings. Only `endpoint-watch`
-   remains: vendor ToS and pricing pages are prose, so it needs page diffing rather than a JSON
-   reader.
+2. **Discovery watchers** (§7). **Done** — all six shipped on 2026-08-31: `release-watch`,
+   `liveness-watch`, `license-watch`, `vuln-watch` (OSV), `definition-watch` and `endpoint-watch` in
+   `apps/worker/src/watchers/`, scheduled and writing dated drift findings. `endpoint-watch` hashes
+   the normalised vendor page rather than parsing prose: a changed hash is a `review` finding for a
+   human to read, and a page with no recorded baseline reports its hash as `unverified`.
 3. **More adapters** (§8). Two engines is not an ecosystem. The next ones follow the verified Tier-A
    list: subfinder, dnsx, httpx, Sherlock (already passported), then the free public APIs (RDAP,
    DoH, GLEIF, crt.sh) which need no credentials and no container.

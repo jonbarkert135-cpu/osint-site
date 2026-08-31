@@ -8,7 +8,7 @@
 
 export interface WatchedEngine {
   readonly id: string;
-  /** `owner/repo` on GitHub. Watchers do nothing for an engine without an upstream repo. */
+  /** `owner/repo` on GitHub, or `''` for a BYOK vendor with no repository to watch. */
   readonly repo: string;
   /** The version this repository pins, exactly as the manifest states it. */
   readonly pinnedVersion?: string;
@@ -18,6 +18,8 @@ export interface WatchedEngine {
   readonly verifiedOn: string;
   /** Package coordinates for advisory lookups, when the engine ships as one. */
   readonly pkg?: { readonly ecosystem: string; readonly name: string };
+  /** BYOK vendors publish pricing/ToS as prose; the hash is what a human last read (§5.1). */
+  readonly endpoint?: { readonly url: string; readonly sha256?: string };
   /** Scraping engines carry a site-definition file; drift in it is silent decay (§5.1). */
   readonly definition?: {
     readonly url: string;
@@ -53,6 +55,16 @@ export const WATCHED_ENGINES: readonly WatchedEngine[] = [
     repo: 'owasp-amass/amass',
     licence: 'Apache-2.0',
     verifiedOn: '2026-08-24',
+  },
+  {
+    id: 'shodan',
+    repo: '',
+    licence: 'proprietary',
+    verifiedOn: '2026-08-31',
+    endpoint: {
+      url: 'https://www.shodan.io/pricing',
+      // No baseline yet — the first run records the hash it reads, a human confirms it here.
+    },
   },
   {
     id: 'spiderfoot',

@@ -9,6 +9,8 @@
  *    without a GitHub token.
  */
 
+import { createHash } from 'node:crypto';
+
 import type { WatchedEngine } from './watched.ts';
 
 export type WatcherName =
@@ -16,7 +18,8 @@ export type WatcherName =
   | 'liveness-watch'
   | 'license-watch'
   | 'vuln-watch'
-  | 'definition-watch';
+  | 'definition-watch'
+  | 'endpoint-watch';
 
 export type DriftSeverity = 'info' | 'review' | 'block';
 
@@ -41,7 +44,12 @@ export interface WatcherDeps {
 }
 
 /** Everything a watcher may read. Both readers are injected; nothing here opens its own socket. */
-export type WatcherReaders = WatcherDeps & { readonly json?: JsonFetch };
+export type WatcherReaders = WatcherDeps & {
+  readonly json?: JsonFetch;
+  readonly text?: TextFetch;
+};
+
+const at = (deps: WatcherDeps): string => (deps.now?.() ?? new Date()).toISOString();
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -221,7 +229,12 @@ export const runWatcher = async (
   const check = WATCHERS[name];
   const findings: DriftFinding[] = [];
   for (const engine of engines) {
-    findings.push(await check(engine, deps));
+    // Vendor rows carry no repo; the GitHub-backed watchers have nothing to read for them.
+    findings.push(
+      engine.repo === '' && name !== 'endpoint-watch'
+        ? unverified(name, engine, at(deps), 'no upstream repository', 'not a GitHub-hosted engine')
+        : await check(engine, deps),
+    );
   }
   return findings;
 };
@@ -340,6 +353,62 @@ export const definitionWatch = async (
       };
 };
 
+/** Injected: a read-only GET returning page text, or undefined when it could not read. */
+export type TextFetch = (url: string) => Promise<string | undefined>;
+
+/**
+ * Vendor status/pricing/ToS pages are prose, so there is nothing to parse — the check is only
+ * "did this page change since a human last read it". A change is `review`: someone re-reads the
+ * page and records the new hash. Whitespace is normalised so a re-flow is not reported as a change.
+ */
+export const endpointWatch = async (
+  engine: WatchedEngine,
+  deps: WatcherReaders,
+): Promise<DriftFinding> => {
+  const now = at(deps);
+  const endpoint = engine.endpoint;
+  const source = endpoint?.url ?? 'no vendor page';
+  if (endpoint === undefined || deps.text === undefined) {
+    return unverified('endpoint-watch', engine, now, source, 'this engine has no vendor page');
+  }
+
+  const page = await deps.text(endpoint.url);
+  if (page === undefined) {
+    return unverified('endpoint-watch', engine, now, source, 'the vendor page could not be read');
+  }
+
+  const digest = createHash('sha256').update(page.replace(/\s+/gu, ' ').trim()).digest('hex');
+  if (endpoint.sha256 === undefined) {
+    return unverified(
+      'endpoint-watch',
+      engine,
+      now,
+      source,
+      `no baseline recorded; the page reads ${digest} today`,
+    );
+  }
+
+  return digest === endpoint.sha256
+    ? {
+        watcher: 'endpoint-watch',
+        engine: engine.id,
+        at: now,
+        status: 'ok',
+        severity: 'info',
+        detail: 'the vendor page is unchanged since it was last read',
+        source,
+      }
+    : {
+        watcher: 'endpoint-watch',
+        engine: engine.id,
+        at: now,
+        status: 'drift',
+        severity: 'review',
+        detail: `the vendor page changed (${endpoint.sha256} \u2192 ${digest}) \u2014 re-read it before relying on the terms`,
+        source,
+      };
+};
+
 export const WATCHERS: Readonly<
   Record<WatcherName, (engine: WatchedEngine, deps: WatcherReaders) => Promise<DriftFinding>>
 > = {
@@ -348,4 +417,5 @@ export const WATCHERS: Readonly<
   'license-watch': licenseWatch,
   'vuln-watch': vulnWatch,
   'definition-watch': definitionWatch,
+  'endpoint-watch': endpointWatch,
 };

@@ -31,6 +31,7 @@ import {
   WATCHER_QUEUE,
   githubGet,
   jsonFetch,
+  textFetch,
   processWatcherJob,
   registerWatcherSchedule,
 } from './watchers/queue.ts';
@@ -322,6 +323,7 @@ export function start(): Promise<() => Promise<void>> {
       const findings = await processWatcherJob(job.name as WatcherName, {
         github: githubGet,
         json: jsonFetch,
+        text: textFetch,
       });
       const drift = findings.filter((finding) => finding.status === 'drift');
       log.info(

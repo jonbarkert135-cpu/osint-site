@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -5,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   definitionWatch,
+  endpointWatch,
   licenseWatch,
   livenessWatch,
   releaseWatch,
@@ -174,5 +176,48 @@ describe('definition-watch (§7)', () => {
     const finding = await definitionWatch(withBaseline(), defs(sites(400)));
     expect(finding.status).toBe('unverified');
     expect(finding.detail).toContain('400');
+  });
+});
+
+describe('endpoint-watch (§7)', () => {
+  const page = 'Pricing:  $59 / month';
+  // sha256 of the whitespace-normalised page, computed the same way the watcher does.
+  const baseline = createHash('sha256').update(page.replace(/\s+/gu, ' ').trim()).digest('hex');
+  const vendor = (sha256?: string): WatchedEngine => ({
+    ...engine,
+    repo: '',
+    endpoint: { url: 'https://example.com/pricing', ...(sha256 === undefined ? {} : { sha256 }) },
+  });
+  const pages = (body: string | undefined) => ({
+    github: async () => undefined,
+    text: async () => body,
+    now,
+  });
+
+  it('stays quiet while the page reads the same, ignoring re-flowed whitespace', async () => {
+    const finding = await endpointWatch(vendor(baseline), pages('Pricing:\n$59 / month\n'));
+    expect(finding).toMatchObject({ status: 'ok' });
+  });
+
+  it('raises a review finding when the vendor page changed', async () => {
+    const finding = await endpointWatch(vendor(baseline), pages('Pricing: $99 / month'));
+    expect(finding).toMatchObject({ status: 'drift', severity: 'review' });
+  });
+
+  it('reports the observed hash when no baseline was ever recorded', async () => {
+    const finding = await endpointWatch(vendor(), pages(page));
+    expect(finding.status).toBe('unverified');
+    expect(finding.detail).toContain(baseline);
+  });
+
+  it('records an unreadable page as unverified, not as unchanged', async () => {
+    expect(await endpointWatch(vendor(baseline), pages(undefined))).toMatchObject({
+      status: 'unverified',
+    });
+  });
+
+  it('does not pretend to check GitHub for a vendor row', async () => {
+    const findings = await runWatcher('release-watch', [vendor(baseline)], pages(page));
+    expect(findings[0]).toMatchObject({ status: 'unverified' });
   });
 });

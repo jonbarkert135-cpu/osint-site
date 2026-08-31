@@ -27,6 +27,7 @@ export const WATCHER_SCHEDULE: Readonly<Record<WatcherName, string>> = {
   'definition-watch': '40 5 * * *',
   'liveness-watch': '40 6 * * 1',
   'license-watch': '10 7 * * 1',
+  'endpoint-watch': '40 7 * * 1',
 };
 
 /** Anonymous, read-only GitHub JSON. A token lifts the 60 req/h limit when one is configured. */
@@ -60,6 +61,16 @@ export const jsonFetch: JsonFetch = async (url, init) => {
           }),
     });
     return response.ok ? await response.json() : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/** Read-only page text for the vendor-page watcher. */
+export const textFetch = async (url: string): Promise<string | undefined> => {
+  try {
+    const response = await fetch(url, { headers: { 'user-agent': 'raven-registry-watcher' } });
+    return response.ok ? await response.text() : undefined;
   } catch {
     return undefined;
   }
