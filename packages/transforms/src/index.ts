@@ -9,6 +9,8 @@ export * from './history.ts';
 export * from './cache.ts';
 export * from './runtime.ts';
 export * from './adapters.ts';
+export * from './document.ts';
+export * from './install.ts';
 export * from './remote.ts';
 export { createCatalogRegistry } from './catalog/index.ts';
 export * from './sdk/index.ts';

@@ -116,3 +116,52 @@ rather than failing at run time.
 2. No external worker implementation ships with the repo; the queue is exercised by tests only.
 3. Footprints for derived passports are conservative defaults, not measurements. Real numbers come
    from running the engines under the resource manager (`29` §6) and recording what they use.
+
+## 8. The manifest as one document (§39)
+
+The engine manifest is stored split — engine / provider / transform (21_TRANSFORM_SYSTEM.md §3) —
+because one engine serves several transforms and one provider several engines. Copying `inputs`,
+`outputs` or `licence` onto the engine would create a second version of a fact that already exists,
+and the copy is the one that goes stale.
+
+`engineDocument()` (`packages/transforms/src/document.ts`) is therefore the _joined view_, not a
+new file format: name, version, runtime, deployment, inputs, outputs, capabilities, transforms,
+requirements, permissions, `execution` (cost, data flow, terminal, adapter state, host
+compatibility, expected runtime, max results, docker flags) and the provider facts an installer
+needs (credentials, pricing, licence, attribution). It is what `/system` → Engines and the install
+pipeline read.
+
+Two deliberate choices:
+
+- **derived, never authored**: `inputs`/`outputs`/`capabilities` come from the transforms that route
+  to the engine, so a manifest cannot advertise an input nothing accepts;
+- **an unknown provider is never permissive**: the document reports `licence: "unknown"` and
+  `credentials: "required"`, which makes the install gates refuse it instead of waving it through.
+
+## 9. Installing an integration (§40)
+
+`installEngine()` (`packages/transforms/src/install.ts`) is "Install Integration" as eight ordered
+gates. It is pure: it takes an already-fetched bundle of manifests plus the checks it must not
+invent, and returns a report — plus a **new** registry only when every gate passed. Downloading and
+unpacking belong to the caller; judging belongs here.
+
+| #   | Gate          | Refuses when                                                                      |
+| --- | ------------- | --------------------------------------------------------------------------------- |
+| 1   | manifest      | schema invalid, package does not compose, engine id already installed             |
+| 2   | compatibility | the passport does not run on this host profile (`29` §7)                          |
+| 3   | licence       | the provider is missing (no licence is stated) or its licence is not allow-listed |
+| 4   | dependencies  | container image not pinned by digest, or registry validation reports an issue     |
+| 5   | security      | it asks for a permission the workspace has not granted                            |
+| 6   | adapter       | no adapter is implemented for its runtime (§37/§38)                               |
+| 7   | health check  | the injected probe fails, returns a reason, or throws                             |
+| 8   | register      | — records the resulting registry                                                  |
+
+Rules that follow from the invariants: gates after the failing one report `not-run`, so the report
+shows exactly where it stopped; the health probe is **required** in the context — an install nobody
+probed is an install nobody can trust, and an unverifiable gate fails rather than being skipped
+(N4/U5); nothing is mutated in place, so a failed install cannot leave a half-registered engine.
+
+Known consequence, stated rather than papered over: an engine whose passport is _derived_ as
+containerized (a `subprocess` permission with no declared runtime) carries no image, so gate 4
+refuses it. Containerized engines must declare `runtime.requirements.image` with a `@sha256:` digest
+to be installable. Not built here: fetching and signature verification of the package itself.
