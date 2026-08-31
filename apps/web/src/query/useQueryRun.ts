@@ -11,6 +11,7 @@
 import {
   executePlan,
   createEngineLibrary,
+  createResourceManager,
   type InvestigationResult,
   type QueryEvent,
   type QueryPlan,
@@ -28,6 +29,12 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { recordRuns } from '../system/runtimeStore.ts';
 import { createBrowserHostFetch } from './hostFetch.ts';
 import { keepRawOutput } from './rawOutput.ts';
+
+/**
+ * One admission-control accountant per tab (§32): the browser tab is the host, so its ceiling is
+ * shared by every run in it. An engine that does not fit is skipped, not crashed (U5).
+ */
+const resources = createResourceManager();
 
 export type RunPhase = 'idle' | 'running' | 'done' | 'failed';
 
@@ -279,6 +286,7 @@ export function useQueryRun(options: UseQueryRunOptions = {}): QueryRunControlle
           signal: controller.signal,
           // Raw output is provenance (§9.4): kept for the analyst to download, never re-parsed.
           persistChunks: keepRawOutput,
+          resources,
         });
         for (;;) {
           const step = await stream.next();

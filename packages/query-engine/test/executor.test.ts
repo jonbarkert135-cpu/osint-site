@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 
 import { createEngineLibrary, executePlan, runPlan, type ExecuteDeps } from '../src/executor.ts';
 import { planQuery } from '../src/plan.ts';
+import { createResourceManager, DEFAULT_RESOURCE_BUDGET } from '../src/resources.ts';
 import type { QueryEvent } from '../src/events.ts';
 
 const registry = createCatalogRegistry();
@@ -257,5 +258,26 @@ describe('raw output persistence', () => {
     expect(failing.result.entities.map((entity) => entity.value)).toEqual(
       result.entities.map((entity) => entity.value),
     );
+  });
+});
+
+describe('admission control (§32)', () => {
+  it('runs normally while the host has room, and releases every lease afterwards', async () => {
+    const resources = createResourceManager();
+    const { result } = await collect(planQuery(registry, 'example.com', ctx()), { resources });
+    expect(result.entities.length).toBeGreaterThan(0);
+    expect(resources.usage().inFlight).toBe(0);
+  });
+
+  it('skips a step the host has no capacity for instead of failing the query', async () => {
+    const resources = createResourceManager({ ...DEFAULT_RESOURCE_BUDGET, memoryMb: 1 });
+    const { events, result } = await collect(planQuery(registry, 'example.com', ctx()), {
+      resources,
+    });
+    const skips = events.filter(
+      (event) => event.type === 'step.skipped' && event.reason === 'over-capacity',
+    );
+    expect(skips.length).toBeGreaterThan(0);
+    expect(result.summary.warnings.some((warning) => warning.includes('RAM left'))).toBe(true);
   });
 });

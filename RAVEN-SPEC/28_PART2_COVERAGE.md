@@ -177,15 +177,15 @@ make the number unfalsifiable. Marking a finding as evidence (§22) is the hones
 
 ## Batch: §27–§33 (2026-08-25)
 
-| §   | Requirement           | Where it now lives                                                      | State                            |
-| --- | --------------------- | ----------------------------------------------------------------------- | -------------------------------- |
-| 27  | Service health center | `packages/query-engine/src/health.ts` + `/system` → Health              | ✅ code                          |
-| 28  | Engine registry       | `/system` → Engines, read from engine/transform manifests               | ✅ code                          |
-| 29  | Failure isolation     | `runIsUsable()`, per-engine rows; invariant U5                          | ✅ code + test                   |
-| 30  | Retry system          | `applyAction()` + row menu (records intent, never executes — N5)        | ✅ code                          |
-| 31  | Timeout management    | `EngineLimits` / `DEFAULT_LIMITS`                                       | ⚠️ boundary only                 |
-| 32  | Resource manager      | `packages/query-engine/src/resources.ts` (fair share 60 %)              | ⚠️ boundary only                 |
-| 33  | Hidden Cloud          | `29_RUNTIME_ENVIRONMENT.md` §7 — VPS profile + `scripts/survey-host.sh` | ✅ resolved, capacity unmeasured |
+| §   | Requirement           | Where it now lives                                                         | State                            |
+| --- | --------------------- | -------------------------------------------------------------------------- | -------------------------------- |
+| 27  | Service health center | `packages/query-engine/src/health.ts` + `/system` → Health                 | ✅ code                          |
+| 28  | Engine registry       | `/system` → Engines, read from engine/transform manifests                  | ✅ code                          |
+| 29  | Failure isolation     | `runIsUsable()`, per-engine rows; invariant U5                             | ✅ code + test                   |
+| 30  | Retry system          | `applyAction()` + row menu (records intent, never executes — N5)           | ✅ code                          |
+| 31  | Timeout management    | `deadlineFor()` in the executor + the `executionMs` ceiling                | ✅ enforced per run              |
+| 32  | Resource manager      | `packages/query-engine/src/resources.ts`, wired as `ExecuteDeps.resources` | ✅ enforced per run              |
+| 33  | Hidden Cloud          | `29_RUNTIME_ENVIRONMENT.md` §7 — VPS profile + `scripts/survey-host.sh`    | ✅ resolved, capacity unmeasured |
 
 Design and the honest gap list: `29_RUNTIME_ENVIRONMENT.md`. §33 was closed on 2026-08-25 once the
 owner confirmed the target: a self-managed Linux VPS (Ubuntu LTS, x86_64, root, Docker Engine,
@@ -193,6 +193,13 @@ systemd, persistent disk, nginx + Let's Encrypt) rather than a PaaS. Containeriz
 therefore allowed with explicit per-container limits. What remains unverified is machine capacity —
 RAM, cores, disk, Docker version — which `scripts/survey-host.sh` answers when run on the host; the
 resource budget keeps its conservative defaults until that output is recorded.
+
+§31 and §32 stopped being boundary-only on 2026-08-31: the executor now asks the injected
+`ResourceManager` for a lease before every engine run (CPU and RAM from the engine passport,
+`executionMs` from the transform deadline) and releases it in a `finally`. A refusal is a
+`step.skipped` event with reason `over-capacity` plus the accountant's own message in the run
+warnings — the query still returns everything it already produced (U5). `apps/web` holds one
+manager per tab; a host that runs a single engine at a time omits the dependency.
 
 ## Batch: §34–§39 (2026-08-25)
 

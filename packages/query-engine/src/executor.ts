@@ -14,6 +14,7 @@
  */
 
 import {
+  resolveRuntime,
   runEngine,
   type EngineId,
   type EntityKind,
@@ -32,6 +33,8 @@ import {
   type RunOutcome,
   type RawChunk,
 } from '@nexus/transforms';
+
+import type { ResourceManager } from './resources.ts';
 
 import type {
   InvestigationResult,
@@ -77,6 +80,12 @@ export interface ExecuteDeps {
    * failure to store must never fail the run: the answer is already computed.
    */
   readonly persistChunks?: (runId: string, chunks: readonly RawChunk[]) => void | Promise<void>;
+  /**
+   * Admission control (§32). Injected because the ceiling belongs to the host process, not to a
+   * plan: a host that runs one engine at a time simply omits it. A refused engine is a skipped
+   * step, never a crash (U5).
+   */
+  readonly resources?: ResourceManager;
 }
 
 const DEFAULT_BUDGET: Budget = {
@@ -371,6 +380,20 @@ export async function* executePlan(
         return;
       }
 
+      const requirements = resolveRuntime(manifest).requirements;
+      const grant = deps.resources?.acquire({
+        engine: engineId,
+        cpu: requirements.cpu,
+        memoryMb: requirements.memoryMb,
+        executionMs: deadlineFor(transform),
+      });
+      if (grant !== undefined && !grant.ok) {
+        skipped += 1;
+        warnings.push(grant.message);
+        emit({ type: 'step.skipped', step: ref, reason: 'over-capacity' });
+        return;
+      }
+
       const outcome = await runEngine(engine, {
         input: { kind: input.kind, value: runInput.value, entityId: input.entityId },
         mode: deps.mode,
@@ -385,6 +408,8 @@ export async function* executePlan(
           : {}),
         ...(deps.signal ? { signal: deps.signal } : {}),
         now,
+      }).finally(() => {
+        if (grant?.ok === true) grant.lease.release();
       });
 
       if (deps.persistChunks !== undefined && outcome.chunks.length > 0) {

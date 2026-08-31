@@ -267,6 +267,7 @@ export type ExclusionReason =
   | 'not-executable'
   | 'permission-denied'
   | 'budget-exhausted'
+  | 'over-capacity'
   | 'already-covered'
   | 'no-engine';
 

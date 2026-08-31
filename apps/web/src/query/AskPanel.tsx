@@ -51,6 +51,7 @@ const REASON_LABELS: Record<string, string> = {
   'no-engine': 'no engine',
   'already-covered': 'already covered',
   'budget-exhausted': 'over budget',
+  'over-capacity': 'host at capacity',
 };
 
 export function AskPanel({ open, onClose, doc, boardId, onUndo, hostFetch }: AskPanelProps) {
