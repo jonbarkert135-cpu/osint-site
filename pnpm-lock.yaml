@@ -122,6 +122,9 @@ importers:
       '@nexus/integrations':
         specifier: workspace:*
         version: link:../../packages/integrations
+      '@nexus/query-engine':
+        specifier: workspace:*
+        version: link:../../packages/query-engine
       '@nexus/transforms':
         specifier: workspace:*
         version: link:../../packages/transforms

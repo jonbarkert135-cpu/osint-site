@@ -161,11 +161,12 @@ run console (§24).
    engine definitions. What is still missing is the last mile: the containerized engines have no
    pinned image digest, so they stay disabled-not-`:latest` until an operator pins one, and the web
    app deliberately does not offer them (a browser has no adapter — invariant N2).
-2. A plan step now reaches an `AdapterRegistry` — through `registryEngines()` for a host with
-   adapters, or `createQueueAdapter()` for one that queues the work. What is still missing is a
-   process that owns both halves: the browser has no adapter by design (N2) and the runner does not
-   execute plans, so today the wiring is exercised by tests. The containerized engines also still
-   have no pinned image digest (`13_SHERLOCK.md` §1.2).
+2. Both halves now live in one process: `apps/runner/src/plan.ts` registers the host's four
+   adapters, builds the engine library with `registryEngines()` and runs a plan through
+   `executePlan`. The browser keeps its builtin-only library by design (N2). What is still missing
+   is the trigger — no queue message asks the runner for a plan yet, so the host is called by tests
+   and by an embedder, not by the product. The containerized engines also still have no pinned image
+   digest (`13_SHERLOCK.md` §1.2).
 3. The external worker loop ships (`packages/transforms/src/remoteWorker.ts`) but no deployment
    does: nothing in the repo runs it on a second machine, and no HTTP transport is written, so §36
    is still exercised by tests rather than in production.
