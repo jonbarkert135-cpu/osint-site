@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { createAdapterEngine, defaultReadValue } from '../src/sdk/adapterEngine.ts';
-import { createCliAdapter } from '../src/cliAdapter.ts';
+import { AdapterRegistry } from '../src/adapters.ts';
+import { createCatalogRegistry } from '../src/catalog/index.ts';
+import { createCliAdapter, createPythonAdapter } from '../src/cliAdapter.ts';
 import { runEngine } from '../src/sdk/run.ts';
-import { adapterEngines } from '../src/sdk/engines/cli-engines.ts';
+import { adapterEngines, registryEngines } from '../src/sdk/engines/cli-engines.ts';
 import type { EngineMetadata } from '../src/sdk/types.ts';
 
 const metadata: EngineMetadata = {
@@ -133,6 +135,44 @@ describe('subfinder and amass', () => {
 
   it.each(['subfinder', 'amass'])('%s proposes hostnames for a domain', async (id) => {
     const outcome = await runEngine(adapterEngines(hostAdapter)[id]?.() as never, {
+      input: { kind: 'domain', value: 'example.com' },
+      mode: 'configured',
+      deadlineMs: 5_000,
+      maxResults: 100,
+      fetch: async () => ({ status: 200, body: null }),
+    });
+    expect(outcome.entities).toEqual([
+      expect.objectContaining({ kind: 'hostname', value: 'a.example.com' }),
+    ]);
+  });
+});
+
+describe('registryEngines', () => {
+  const catalog = createCatalogRegistry();
+  const cli = createCliAdapter({
+    run: async () => ({ code: 0, stdout: '{"host":"a.example.com"}' }),
+  });
+  const python = createPythonAdapter({ run: async () => ({ code: 0, stdout: '{}' }) });
+
+  it('offers only the engines whose runtime has an adapter here', () => {
+    const registry = new AdapterRegistry().register(cli);
+    expect(Object.keys(registryEngines(registry, catalog)).sort()).toEqual(['amass', 'subfinder']);
+
+    registry.register(python);
+    expect(Object.keys(registryEngines(registry, catalog)).sort()).toEqual([
+      'amass',
+      'sherlock',
+      'subfinder',
+    ]);
+  });
+
+  it('offers nothing when the host registered no adapter at all', () => {
+    expect(registryEngines(new AdapterRegistry(), catalog)).toEqual({});
+  });
+
+  it('builds engines the executor can run', async () => {
+    const engine = registryEngines(new AdapterRegistry().register(cli), catalog)['subfinder']?.();
+    const outcome = await runEngine(engine as never, {
       input: { kind: 'domain', value: 'example.com' },
       mode: 'configured',
       deadlineMs: 5_000,
