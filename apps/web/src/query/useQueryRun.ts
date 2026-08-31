@@ -27,6 +27,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { recordRuns } from '../system/runtimeStore.ts';
 import { createBrowserHostFetch } from './hostFetch.ts';
+import { keepRawOutput } from './rawOutput.ts';
 
 export type RunPhase = 'idle' | 'running' | 'done' | 'failed';
 
@@ -276,6 +277,8 @@ export function useQueryRun(options: UseQueryRunOptions = {}): QueryRunControlle
           fetch: hostFetch,
           cache,
           signal: controller.signal,
+          // Raw output is provenance (§9.4): kept for the analyst to download, never re-parsed.
+          persistChunks: keepRawOutput,
         });
         for (;;) {
           const step = await stream.next();

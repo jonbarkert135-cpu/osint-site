@@ -30,6 +30,7 @@ import {
   type TransformRegistry,
   type Budget,
   type RunOutcome,
+  type RawChunk,
 } from '@nexus/transforms';
 
 import type {
@@ -70,6 +71,12 @@ export interface ExecuteDeps {
   readonly runId?: () => string;
   /** Overrides the plan's budget; the plan's own budget is used otherwise. */
   readonly budget?: Budget;
+  /**
+   * Keeps the raw engine output of a step (§9.4 provenance, L4.3 replay). Injected because this
+   * package must not touch a disk or a database; a host that does not care simply omits it. A
+   * failure to store must never fail the run: the answer is already computed.
+   */
+  readonly persistChunks?: (runId: string, chunks: readonly RawChunk[]) => void | Promise<void>;
 }
 
 const DEFAULT_BUDGET: Budget = {
@@ -379,6 +386,14 @@ export async function* executePlan(
         ...(deps.signal ? { signal: deps.signal } : {}),
         now,
       });
+
+      if (deps.persistChunks !== undefined && outcome.chunks.length > 0) {
+        try {
+          await deps.persistChunks(runId, outcome.chunks);
+        } catch {
+          // Storing evidence is best-effort; losing it must not lose the results with it.
+        }
+      }
 
       const status = statusOf(outcome);
       const source: Provenance = {

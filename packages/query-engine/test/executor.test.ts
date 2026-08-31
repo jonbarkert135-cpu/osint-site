@@ -239,3 +239,23 @@ describe('executePlan', () => {
     expect(result.summary.warnings[0]).toMatch(/routable/u);
   });
 });
+
+describe('raw output persistence', () => {
+  it('hands each run its chunks, and keeps the results when the store fails', async () => {
+    const stored: string[] = [];
+    const { result } = await collect(planQuery(registry, 'example.com', ctx()), {
+      persistChunks: (runId, chunks) => {
+        stored.push(runId);
+        expect(chunks.length).toBeGreaterThan(0);
+      },
+    });
+    expect(stored.length).toBeGreaterThan(0);
+
+    const failing = await collect(planQuery(registry, 'example.com', ctx()), {
+      persistChunks: () => Promise.reject(new Error('disk full')),
+    });
+    expect(failing.result.entities.map((entity) => entity.value)).toEqual(
+      result.entities.map((entity) => entity.value),
+    );
+  });
+});
