@@ -13,6 +13,12 @@
 import { engineDocument } from './document.ts';
 import { parseEngineManifest, parseProviderManifest, parseTransformManifest } from './manifest.ts';
 import { createTransformRegistry, type TransformRegistry } from './registry.ts';
+import {
+  licenceReview,
+  securityReview,
+  type LicencePolicy,
+  type ProjectDeclaration,
+} from './review.ts';
 import type { EngineManifest, ManifestIssue, Permission, ProviderManifest } from './types.ts';
 
 /** What the caller hands over: the manifests of one integration, already fetched and parsed as JSON. */
@@ -43,6 +49,13 @@ export interface InstallStep {
 export interface InstallResult {
   readonly engine?: string;
   readonly installed: boolean;
+  /**
+   * §61 safe default: an install never enables anything. The engine is registered and visible, and
+   * a human (or the governance ledger, §58) flips it on once it is owned, tested and policed.
+   */
+  readonly enabled: false;
+  /** What still has to happen before this integration may be enabled. */
+  readonly pending: readonly string[];
   readonly steps: readonly InstallStep[];
   /** The registry with the package added — present only on a fully successful install. */
   readonly registry?: TransformRegistry;
@@ -64,6 +77,15 @@ export interface InstallContext {
   readonly healthCheck: HealthProbe;
   /** Runtimes an adapter is wired for here; defaults to the repo's ADAPTER_SUPPORT table. */
   readonly implementedRuntimes?: ReadonlySet<string>;
+  /**
+   * What the reviewer found out about the project itself (§59/§60): its licence, dependency
+   * licences, advisories, execution model, filesystem and network reach, secrets. When it is
+   * absent the licence and security gates fall back to the manifest alone, and say so — a
+   * manifest is the vendor's claim about itself, not an audit.
+   */
+  readonly project?: ProjectDeclaration;
+  /** Licence policy for the §60 check; defaults to `allowedLicences` with commercial use assumed. */
+  readonly licencePolicy?: LicencePolicy;
 }
 
 const ok = (step: InstallStepName, detail: string): InstallStep => ({ step, status: 'ok', detail });
@@ -98,9 +120,12 @@ export const installEngine = async (
   ctx: InstallContext,
 ): Promise<InstallResult> => {
   const steps: InstallStep[] = [];
+  const pending: string[] = [];
   const stop = (step: InstallStep, engine?: string): InstallResult => ({
     ...(engine ? { engine } : {}),
     installed: false,
+    enabled: false,
+    pending: [`fix: ${step.detail}`],
     steps: stopAt(steps, step),
   });
 
@@ -160,7 +185,21 @@ export const installEngine = async (
   if (!ctx.allowedLicences.has(doc.provider.licence)) {
     return stop(failed('licence', `licence "${doc.provider.licence}" is not allowed`), engine.id);
   }
-  steps.push(ok('licence', doc.provider.licence));
+  const policy: LicencePolicy = ctx.licencePolicy ?? {
+    allowed: ctx.allowedLicences,
+    commercial: true,
+  };
+  if (ctx.project) {
+    const review = licenceReview(ctx.project, policy);
+    if (review.verdict === 'refuse') {
+      return stop(failed('licence', review.summary), engine.id);
+    }
+    if (review.verdict === 'review') pending.push(review.summary);
+    steps.push(ok('licence', `${doc.provider.licence}; ${review.summary.split('\n')[0] ?? ''}`));
+  } else {
+    pending.push('licence: only the provider manifest was checked; no dependency licence scan ran');
+    steps.push(ok('licence', doc.provider.licence));
+  }
 
   // 4. Dependencies — provider present, image pinned, references resolve.
   const image = doc.requirements.image;
@@ -185,7 +224,17 @@ export const installEngine = async (
   if (missing.length > 0) {
     return stop(failed('security', `permissions not granted: ${missing.join(', ')}`), engine.id);
   }
-  steps.push(ok('security', `permissions: ${engine.permissions.join(', ') || 'none'}`));
+  if (ctx.project) {
+    const review = securityReview(ctx.project, ctx.grantedPermissions);
+    if (review.verdict === 'refuse') {
+      return stop(failed('security', review.summary), engine.id);
+    }
+    if (review.verdict === 'review') pending.push(review.summary);
+    steps.push(ok('security', `permissions granted; ${review.summary.split('\n')[0] ?? ''}`));
+  } else {
+    pending.push('security: no execution-model, dependency or vulnerability review was supplied');
+    steps.push(ok('security', `permissions: ${engine.permissions.join(', ') || 'none'}`));
+  }
 
   // 6. Adapter — a runtime with no adapter cannot execute, however well it validates (§37/§38).
   const supported = ctx.implementedRuntimes
@@ -221,5 +270,15 @@ export const installEngine = async (
       `registered ${engine.id} (${doc.transforms.length} transform(s), ${doc.capabilities.join(', ')})`,
     ),
   );
-  return { engine: engine.id, installed: true, steps, registry: candidate };
+  // §58: registered is not the same as owned. The three facts no manifest can prove are demanded
+  // here so an integration cannot enter the build without somebody's name on it.
+  pending.push('governance: record an owner, the §62 test kinds and a deprecation policy (§58)');
+  return {
+    engine: engine.id,
+    installed: true,
+    enabled: false,
+    pending,
+    steps,
+    registry: candidate,
+  };
 };

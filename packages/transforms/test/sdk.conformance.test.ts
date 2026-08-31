@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatConformance, runConformance } from '../src/sdk/conformance.ts';
+import { conformanceCoverage, formatConformance, runConformance } from '../src/sdk/conformance.ts';
 import { createDohResolver } from '../src/sdk/engines/doh-resolver.ts';
 import { createTestHost } from '../src/sdk/testkit.ts';
 import type { TransformEngine } from '../src/sdk/types.ts';
@@ -46,6 +46,20 @@ describe('doh-resolver conformance', () => {
 
     expect(formatConformance(report)).toBe(`doh-resolver: ${report.checks.length} checks passed`);
     expect(report.passed).toBe(true);
+
+    // Part 2 §62: the harness is the evidence behind the governance ledger's `tests` field.
+    const coverage = conformanceCoverage(report);
+    expect(coverage.missing).toEqual([]);
+    expect(coverage.covered).toEqual([
+      'unit',
+      'integration',
+      'adapter',
+      'health',
+      'timeout',
+      'failure',
+      'normalization',
+      'duplicates',
+    ]);
   });
 
   it('resolves records into entities, relationships and evidence', async () => {

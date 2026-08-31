@@ -1,4 +1,9 @@
-import { createCatalogRegistry, engineDocuments, type EngineDocument } from '@nexus/transforms';
+import {
+  createCatalogRegistry,
+  deprecationReport,
+  engineDocuments,
+  type EngineDocument,
+} from '@nexus/transforms';
 import { describe, expect, it } from 'vitest';
 
 import { catalogSummary, integrationCatalog, type CatalogEntry } from '../src/catalog.ts';
@@ -92,5 +97,30 @@ describe('integrationCatalog (Part 2 §55)', () => {
 
     expect(Object.values(summary).reduce((a, b) => a + b, 0)).toBe(entries.length);
     expect(summary.installed).toBe(1);
+  });
+});
+
+describe('integrationCatalog with deprecation signals (Part 2 §57)', () => {
+  it('marks an engine deprecated on upstream signals even when its manifest says stable', () => {
+    const engine = documents.find((document) => document.status === 'stable')?.name ?? '';
+    const deprecation = Object.fromEntries(
+      deprecationReport(registry, { [engine]: { archived: true } }, new Date('2026-08-31')).map(
+        (assessment) => [assessment.engine, assessment],
+      ),
+    );
+
+    const entries = integrationCatalog(registry, { installed: new Set([engine]), deprecation });
+    const entry = find(entries, engine);
+
+    expect(entry?.state).toBe('deprecated');
+    expect(entry?.action).toBe('replace');
+    expect(entry?.detail).toContain('archived');
+  });
+
+  it('leaves engines without signals in their manifest state', () => {
+    const withSignals = integrationCatalog(registry, { installed: new Set(), deprecation: {} });
+    const without = integrationCatalog(registry, { installed: new Set() });
+
+    expect(withSignals).toEqual(without);
   });
 });

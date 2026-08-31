@@ -12,7 +12,7 @@
  * this module changes when installing from the outside becomes real.
  */
 
-import type { EngineDocument, TransformRegistry } from '@nexus/transforms';
+import type { DeprecationAssessment, EngineDocument, TransformRegistry } from '@nexus/transforms';
 import { engineDocuments } from '@nexus/transforms';
 
 export const CATALOG_STATES = [
@@ -45,6 +45,12 @@ export interface CatalogContext {
   readonly configuredProviders?: ReadonlySet<string>;
   /** Extra documents from outside the local registry: a remote index, a sideloaded package. */
   readonly external?: readonly EngineDocument[];
+  /**
+   * Deprecation verdicts from `deprecationReport()` (Part 2 §57), keyed by engine. An engine whose
+   * upstream died is `deprecated` here even while its manifest still says `stable` — the manifest is
+   * always the last thing to be updated.
+   */
+  readonly deprecation?: Readonly<Record<string, DeprecationAssessment>>;
 }
 
 const stateOf = (
@@ -52,6 +58,16 @@ const stateOf = (
   ctx: CatalogContext,
 ): { readonly state: CatalogState; readonly detail: string } => {
   const { execution, provider, status } = document;
+  const assessment = ctx.deprecation?.[document.name];
+  if (assessment && (assessment.verdict === 'deprecated' || assessment.verdict === 'suspected')) {
+    const because = assessment.evidence[0] ?? 'upstream signals';
+    return {
+      state: 'deprecated',
+      detail: assessment.replacement
+        ? `${because}; replace with ${assessment.replacement.engine} (${assessment.replacement.reasons.join(', ').toLowerCase()})`
+        : `${because}; no replacement candidate in this registry`,
+    };
+  }
   if (status === 'deprecated')
     return {
       state: 'deprecated',
