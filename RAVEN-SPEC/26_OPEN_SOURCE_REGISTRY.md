@@ -215,6 +215,13 @@ a watcher raises a **drift finding**, a human merges the passport change.
 | `vuln-watch`       | daily   | OSV / GitHub advisories for pinned images and packages | any advisory affecting a pinned engine                              |
 | `endpoint-watch`   | weekly  | vendor status/pricing/ToS pages for BYOK services      | retirement notice, price change, ToS change (cf. Bing's retirement) |
 
+Shipped on 2026-08-31: `release-watch`, `liveness-watch` and `license-watch` live in
+`apps/worker/src/watchers/` as pure checks over an injected GitHub reader, scheduled as repeatable
+BullMQ jobs (`registry.watch`). Findings — including `ok` ones, so an empty day means "the watcher
+did not run" rather than "nothing changed" — append to a dated JSONL file on the persistent disk.
+`definition-watch`, `vuln-watch` and `endpoint-watch` are not built yet. What is watched lives in
+`watchers/watched.ts`, the machine-readable slice of the passports.
+
 Rules: watchers are **read-only** and rate-limit-aware (use a token; GitHub anonymous is 60 req/h and
 was the binding constraint in the 2026-08-24 pass). A watcher that cannot verify records
 `unverified` — it never guesses, and an unverified result is never written as a fact.
