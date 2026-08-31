@@ -5,6 +5,8 @@ export * from './workflow.ts';
 export * from './builder.ts';
 export * from './agent.ts';
 export * from './recommend.ts';
+export * from './catalog.ts';
+export * from './discovery.ts';
 export * from './normalize.ts';
 export * from './resolve.ts';
 export * from './dedupe.ts';

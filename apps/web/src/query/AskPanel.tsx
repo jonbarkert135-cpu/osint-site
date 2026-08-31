@@ -20,12 +20,14 @@ import { Button } from '@nexus/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type * as Y from 'yjs';
 
+import { logActivity } from '../system/activityLog.ts';
+import { ExecutionView } from './ExecutionView.tsx';
 import { ProposalReview } from '../integrations/ProposalReview.tsx';
 import { toImportProposal } from './investigationProposal.ts';
 import { ResultsDashboard } from './ResultsDashboard.tsx';
 import { downloadRawOutput, hasRawOutput } from './rawOutput.ts';
 import { RunConsole } from './RunConsole.tsx';
-import { useQueryRun } from './useQueryRun.ts';
+import { liveCounters, useQueryRun } from './useQueryRun.ts';
 
 export interface AskPanelProps {
   open: boolean;
@@ -63,6 +65,8 @@ export function AskPanel({ open, onClose, doc, boardId, onUndo, hostFetch }: Ask
   const [applied, setApplied] = useState<string | null>(null);
   // §24: folded away by default — available in one click, never in the way.
   const [consoleOpen, setConsoleOpen] = useState(false);
+  // §53: the pipeline view is a second reading of the same run, folded away until asked for.
+  const [execOpen, setExecOpen] = useState(false);
   const runner = useQueryRun(hostFetch === undefined ? {} : { fetch: hostFetch });
 
   // The panel is opened from the palette, so the caret must land in the field: the alternative is
@@ -116,9 +120,9 @@ export function AskPanel({ open, onClose, doc, boardId, onUndo, hostFetch }: Ask
         newId: () => newId.board(),
         now: new Date().toISOString(),
       });
-      setApplied(
-        `Added ${String(outcome.createdNodeIds.length)} node(s) and ${String(outcome.createdEdgeIds.length)} edge(s).`,
-      );
+      const summary = `Added ${String(outcome.createdNodeIds.length)} node(s) and ${String(outcome.createdEdgeIds.length)} edge(s).`;
+      logActivity('import', summary);
+      setApplied(summary);
       runner.reset();
     },
     [proposal, doc, runner],
@@ -287,6 +291,31 @@ export function AskPanel({ open, onClose, doc, boardId, onUndo, hostFetch }: Ask
         </ul>
       ) : null}
 
+      {liveCounters(runner).length > 0 ? (
+        <ul className="nx-ask-counters" data-testid="ask-live-counters" aria-live="polite">
+          {liveCounters(runner).map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      ) : null}
+
+      {runner.phase !== 'idle' ? (
+        <>
+          <button
+            type="button"
+            className="nx-tab"
+            aria-expanded={execOpen}
+            data-testid="ask-exec-toggle"
+            onClick={() => {
+              setExecOpen((current) => !current);
+            }}
+          >
+            Execution View
+          </button>
+          {execOpen ? <ExecutionView state={runner} query={raw} /> : null}
+        </>
+      ) : null}
+
       {investigation !== null && investigation.entities.some((entity) => !entity.seed) ? (
         <ResultsDashboard
           result={investigation}
@@ -347,7 +376,14 @@ export function AskPanel({ open, onClose, doc, boardId, onUndo, hostFetch }: Ask
           open={consoleOpen}
           onToggle={() => setConsoleOpen((current) => !current)}
           running={runner.phase === 'running'}
-          {...(rawRunIds.length === 0 ? {} : { onDownloadRaw: () => downloadRawOutput(rawRunIds) })}
+          {...(rawRunIds.length === 0
+            ? {}
+            : {
+                onDownloadRaw: () => {
+                  logActivity('export', `Raw output of ${String(rawRunIds.length)} run(s)`);
+                  downloadRawOutput(rawRunIds);
+                },
+              })}
         />
       ) : null}
 
