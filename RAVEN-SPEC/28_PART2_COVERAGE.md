@@ -220,3 +220,19 @@ through the same sandbox, egress proxy, limits and artifact collection as every 
 ("every service is a module") from two engines to five. Two honest limits remain: the containerized
 engines still need a pinned image digest before a host may run them, and no external worker ships
 with the repo, so §36 is exercised by tests rather than in production.
+
+## Batch: §39–§41 (2026-08-31)
+
+| §   | Point                  | Where                                                    | State                   |
+| --- | ---------------------- | -------------------------------------------------------- | ----------------------- |
+| 39  | Engine manifest        | `packages/transforms/src/document.ts` (`engineDocument`) | ✅ joined, derived view |
+| 40  | Plugin installation    | `packages/transforms/src/install.ts` (8 gates)           | ✅ pipeline, no UI      |
+| 41  | Service recommendation | `packages/query-engine/src/recommend.ts`                 | ✅ model, no Run-all UI |
+
+Design: `30_ENGINE_RUNTIME_ARCHITECTURE.md` §8–§9 and `24_UNIFIED_QUERY.md` (last section). §39 is
+answered by joining the existing split manifests rather than adding a fourth file: a second copy of
+`inputs`/`outputs`/`licence` on the engine is the copy that goes stale. §40 is pure and injectable —
+it judges a fetched bundle and returns a new registry; fetching, unpacking and package-signature
+verification are explicitly not built. §41 tiers Required / Recommended / Optional from the
+`priority` already on each transform plus the router's verdict, and exposes `runAll` /
+`defaultSelection`; the two buttons themselves are still to be drawn.
