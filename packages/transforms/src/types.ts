@@ -271,6 +271,7 @@ export type ExclusionReason =
   | 'over-resource-budget'
   /** Affordable, but an expensive engine on an input that does not promise much (§42). */
   | 'cost-not-justified'
+  | 'over-capacity'
   | 'already-covered'
   | 'no-engine';
 

@@ -215,6 +215,18 @@ a watcher raises a **drift finding**, a human merges the passport change.
 | `vuln-watch`       | daily   | OSV / GitHub advisories for pinned images and packages | any advisory affecting a pinned engine                              |
 | `endpoint-watch`   | weekly  | vendor status/pricing/ToS pages for BYOK services      | retirement notice, price change, ToS change (cf. Bing's retirement) |
 
+Shipped on 2026-08-31: all six watchers — `release-watch`, `liveness-watch`, `license-watch`,
+`vuln-watch` (OSV), `definition-watch` and `endpoint-watch` — live in `apps/worker/src/watchers/` as
+pure checks over injected readers, scheduled as repeatable BullMQ jobs (`registry.watch`). Findings —
+including `ok` ones, so an empty day means "the watcher did not run" rather than "nothing changed" —
+append to a dated JSONL file on the persistent disk. `endpoint-watch` cannot parse prose, so it does
+the one thing that is honest for a pricing/ToS page: it hashes the whitespace-normalised text and
+reports a change as `review`, for a human to read. A definition file or vendor page with no recorded
+baseline reports what it observed as `unverified` — the number or hash is then written into the
+passport by a human, which is the same propose-never-write rule the other watchers follow. What is
+watched lives in `watchers/watched.ts`, the machine-readable slice of the passports; a BYOK vendor
+row carries no repo, and the GitHub-backed watchers record `unverified` for it rather than guessing.
+
 Rules: watchers are **read-only** and rate-limit-aware (use a token; GitHub anonymous is 60 req/h and
 was the binding constraint in the 2026-08-24 pass). A watcher that cannot verify records
 `unverified` — it never guesses, and an unverified result is never written as a fact.

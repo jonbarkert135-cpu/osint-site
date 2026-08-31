@@ -55,6 +55,10 @@ visual jobs. `ci-ok` is the required gate.
 ## Working agreement
 
 - Never commit to `main`; branch, PR, wait for green CI, merge.
+- **Everything lands in `main`, immediately.** As soon as a PR is green, squash-merge it and delete
+  the branch (`gh pr merge <n> --squash --delete-branch`). Do not park finished work on a branch, do
+  not stack a new PR on an unmerged one, and do not leave stale branches around for the next agent
+  to read — `main` is the only source of truth.
 - Keep the phase trackers (`RAVEN-SPEC/20_ROADMAP.md` and the spec's own status section) updated in
   the same PR as the code.
 - PR bodies stay short: what changed, what was deliberately deferred.
