@@ -5,6 +5,7 @@
  * so a plan can always be shown before a single byte leaves the machine.
  */
 
+import { costProfile, costVerdict, type CostCeiling } from './cost.ts';
 import type { ModeContext } from './modes.ts';
 import type { TransformRegistry } from './registry.ts';
 import { routeForInput, routeTransform, type RoutedTransform } from './router.ts';
@@ -32,6 +33,11 @@ export interface PlannerContext extends ModeContext {
   readonly budget: Budget;
   /** Capabilities already run against this entity: offered last, never re-run automatically. */
   readonly coveredCapabilities?: ReadonlySet<CapabilityId>;
+  /**
+   * Resource ceiling for one step (§42). Omitted means "do not price steps at all" — the planner
+   * stays the pure capability planner it was, which is what the transform-layer tests assume.
+   */
+  readonly costCeiling?: CostCeiling;
 }
 
 export type ExpandDepth = 1 | 2 | 'deep';
@@ -132,6 +138,21 @@ export const expand = (
         excluded.push({ transform: transform.id, reason: 'already-covered' });
         usedTransforms.add(transform.id);
         continue;
+      }
+      if (ctx.costCeiling) {
+        const primary = routed.chain.find((entry) => !entry.engine.terminal);
+        const verdict = primary
+          ? costVerdict(
+              costProfile(transform, primary.engine, primary.provider),
+              routed.score,
+              ctx.costCeiling,
+            )
+          : undefined;
+        if (verdict && !verdict.ok) {
+          excluded.push({ transform: transform.id, reason: verdict.reason, note: verdict.note });
+          usedTransforms.add(transform.id);
+          continue;
+        }
       }
       if (steps.length + accepted.length >= budget.maxTransforms) {
         excluded.push({ transform: transform.id, reason: 'budget-exhausted' });

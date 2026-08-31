@@ -207,3 +207,54 @@ Design and gaps: `30_ENGINE_RUNTIME_ARCHITECTURE.md`. Two honest limits: the cli
 not exist yet, so the three containerized engines (amass, sherlock, subfinder) are classified and
 limited but not runnable; and no external worker ships with the repo, so §36 is exercised by tests
 rather than in production.
+
+## Batch: §42–§44 (2026-08-31)
+
+| §   | Point                    | Where                                                            | State                              |
+| --- | ------------------------ | ---------------------------------------------------------------- | ---------------------------------- |
+| 42  | Cost / resource planning | `packages/transforms/src/cost.ts`, gate inside `expand()`        | ✅ code + test, per-step           |
+| 43  | Query presets            | `packages/query-engine/src/presets.ts` (7 presets)               | ✅ data + planning, no UI yet      |
+| 44  | Workflow builder         | `packages/query-engine/src/workflow.ts` (+ `WORKFLOW_TEMPLATES`) | ⚠️ model + compiler, no builder UI |
+
+**§42.** `costProfile()` prices one step off manifests that already exist — CPU and RAM from the
+engine's runtime passport (§34/§39), execution time from the transform's limits, network requests
+from the data flow plus a pagination estimate (`maxResults / maxInputBatch`, so a subdomain sweep is
+not counted as one request), queue from an `external` deployment (§36), availability from provider
+status, and API limits from the provider's stated quota. `costVerdict()` then refuses with
+`over-resource-budget` or `cost-not-justified`, both carrying a sentence an analyst can read; the
+planner records them in `plan.excluded` like every other drop, so an expensive engine is never
+silently missing. "Expensive only where useful" is implemented as: a class above `standard` needs a
+router score of at least `minValueForExpensive`, i.e. quality × priority, not a guess.
+
+Two deliberate boundaries. **Rate limits are pacing, not refusals**: `paceMs` reports how long a
+provider's quota would stretch a run (GitHub unauthenticated: four pages ≈ four minutes) and only
+an impossible run — more requests than the provider's whole daily allowance — is refused;
+throttling belongs to `EngineLimits` (§31). And **concurrency-wide accounting stays in the runtime
+resource manager** (§32): the cost gate decides whether asking is reasonable, the manager decides
+whether the box can take it right now. A plan that passes here can still be admission-refused
+there, and that is correct, not a gap.
+
+**§43.** Seven presets: Quick Scan (one hop, nothing above `standard`, no queued engines), Deep
+Scan (every compatible engine, two hops, queue allowed, `minValueForExpensive: 0` because breadth
+_is_ the value there), Repository / Username / Domain / Document investigations (each locks the
+entity kind so a repo is never typed as a domain) and Custom (imposes nothing). CPU and RAM
+ceilings do not vary between presets: the host is the binding limit, and raising them would only
+plan steps §32 then refuses. Anything the caller passes explicitly wins over the preset. Document
+Analysis is a node preset — no text types to `file`, so it is reached through
+`applyPreset()` + `expand()` rather than the query bar.
+
+**§44.** A workflow is saved, ordered, declarative data: stages
+`input → normalize → transform* → entity-resolution → graph → ai-summary`, transform steps named by
+manifest id, dependencies by node id. `validateWorkflow()` rejects rather than repairs — stage order
+is a fact (a summary cannot precede its graph), an unknown transform is an error and not a skipped
+step, and a forward reference (how a cycle looks in a declaration-ordered list) is refused.
+`compileWorkflow()` emits the same `TransformPlan` the planner produces, so a workflow inherits the
+DAG scheduler, budgets, the §42 cost gate, provenance and partial results instead of growing its own
+runtime; non-transform stages need no steps because they _are_ the executor's pipeline.
+`parseWorkflow()` treats a saved file as untrusted input.
+
+Honest gaps: no builder UI and no persistence surface yet (a workflow is a value; storing it on a
+board is the next batch), and there is no SpiderFoot engine in the catalogue — `12_SPIDERFOOT.md` is
+spec, not code — so the brief's SpiderFoot slot in `WORKFLOW_TEMPLATES` is filled by the shipped
+broad-sweep transform (`selector-to-web-mentions`) and swaps to `spiderfoot` in one line the day
+that engine lands.

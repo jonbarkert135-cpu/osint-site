@@ -381,6 +381,16 @@ stay on-device and feed the run report; nothing is sent anywhere.
 
 ---
 
+## 14a. Presets, workflows and cost gating (Part 2 §42–§44)
+
+Shipped 2026-08-31: `presets.ts` (seven named bundles of depth, budget and cost ceiling),
+`workflow.ts` (saved pipelines, validated and compiled into a normal `TransformPlan`) and the
+per-step cost gate in `packages/transforms/src/cost.ts`. Design, boundaries and the honest gap list
+live in `28_PART2_COVERAGE.md`, batch §42–§44. Open question 3 below is now partly answered in
+data: Deep Scan is the preset that admits minute-scale runs, and its budget states the ceiling.
+
+---
+
 ## 15. Open questions (to resolve inside P17, not before)
 
 1. Whether the value-scoring model's historical yield is per workspace or per user — privacy vs

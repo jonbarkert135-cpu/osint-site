@@ -4,6 +4,7 @@ export * from './registry.ts';
 export * from './modes.ts';
 export * from './score.ts';
 export * from './router.ts';
+export * from './cost.ts';
 export * from './planner.ts';
 export * from './history.ts';
 export * from './cache.ts';
