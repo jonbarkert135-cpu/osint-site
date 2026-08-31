@@ -8,8 +8,9 @@
  * few lines of mapping rather than a new class.
  */
 
-import type { AdapterInput, EngineAdapter } from '../adapters.ts';
+import type { AdapterError, AdapterInput, EngineAdapter } from '../adapters.ts';
 import type { EntityKind } from '../types.ts';
+import { EngineFailure, type FailureCode } from './run.ts';
 import {
   INPUT_REF,
   type EngineMetadata,
@@ -51,6 +52,15 @@ export interface AdapterEngineOptions {
 
 const DEFAULT_CONFIDENCE = 0.6;
 
+/** Adapter failure kinds that the driver has a matching code for; the rest are engine errors. */
+const FAILURE_CODE: Record<AdapterError['kind'], FailureCode> = {
+  timeout: 'timeout',
+  'invalid-input': 'invalid-input',
+  unavailable: 'engine-error',
+  upstream: 'engine-error',
+  internal: 'engine-error',
+};
+
 export const createAdapterEngine = (options: AdapterEngineOptions): TransformEngine => {
   const metadata = options.metadata;
   const readValue = options.readValue ?? defaultReadValue;
@@ -84,10 +94,11 @@ export const createAdapterEngine = (options: AdapterEngineOptions): TransformEng
       });
 
       if (!result.ok) {
-        // ponytail: the driver files every thrown error as retryable `engine-error`, so an
-        // `invalid-input` refusal is retried once. Carry the kind through `RunFailure` when the
-        // retry budget (§30) starts costing real runs.
-        throw new Error(`${result.error.kind}: ${result.error.message}`);
+        throw new EngineFailure(
+          FAILURE_CODE[result.error.kind],
+          `${result.error.kind}: ${result.error.message}`,
+          result.error.retryable,
+        );
       }
 
       yield {

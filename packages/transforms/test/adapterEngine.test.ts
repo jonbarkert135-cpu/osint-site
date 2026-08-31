@@ -16,7 +16,9 @@ const metadata: EngineMetadata = {
   outputs: ['hostname'],
 };
 
-const engineOver = (stdout: string, failure?: 'timeout') =>
+type Failure = 'timeout' | 'invalid-input' | 'unavailable';
+
+const engineOver = (stdout: string, failure?: Failure) =>
   createAdapterEngine({
     metadata,
     adapter: createCliAdapter({
@@ -24,7 +26,7 @@ const engineOver = (stdout: string, failure?: 'timeout') =>
     }),
   });
 
-const run = (stdout: string, failure?: 'timeout') =>
+const run = (stdout: string, failure?: Failure) =>
   runEngine(engineOver(stdout, failure), {
     input: { kind: 'domain', value: 'example.com' },
     mode: 'configured',
@@ -80,6 +82,17 @@ describe('adapter-backed engine', () => {
     const outcome = await run('', 'timeout');
     expect(outcome.status).toBe('failed');
     expect(outcome.failure?.message).toContain('timeout');
+    expect(outcome.failure?.code).toBe('timeout');
+  });
+
+  it('keeps a refusal non-retryable instead of spending a retry on it', async () => {
+    const outcome = await run('', 'invalid-input');
+    expect(outcome.failure).toMatchObject({ code: 'invalid-input', retryable: false });
+  });
+
+  it('files an adapter kind the driver has no code for as an engine error', async () => {
+    const outcome = await run('', 'unavailable');
+    expect(outcome.failure).toMatchObject({ code: 'engine-error', retryable: false });
   });
 
   it('an empty result is a finding, not a failure', async () => {
