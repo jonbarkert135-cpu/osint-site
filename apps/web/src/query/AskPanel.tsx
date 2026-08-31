@@ -51,6 +51,8 @@ const REASON_LABELS: Record<string, string> = {
   'no-engine': 'no engine',
   'already-covered': 'already covered',
   'budget-exhausted': 'over budget',
+  'over-resource-budget': 'too expensive for this scan',
+  'cost-not-justified': 'not worth the cost here',
   'over-capacity': 'host at capacity',
 };
 

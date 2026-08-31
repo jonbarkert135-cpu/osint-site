@@ -267,6 +267,10 @@ export type ExclusionReason =
   | 'not-executable'
   | 'permission-denied'
   | 'budget-exhausted'
+  /** The step would cost more CPU, RAM, time, requests or quota than this scan allows (§42). */
+  | 'over-resource-budget'
+  /** Affordable, but an expensive engine on an input that does not promise much (§42). */
+  | 'cost-not-justified'
   | 'over-capacity'
   | 'already-covered'
   | 'no-engine';
@@ -307,6 +311,8 @@ export interface PlanEstimate {
 export interface PlanExclusion {
   readonly transform: TransformId;
   readonly reason: ExclusionReason;
+  /** Free text when the reason alone is not enough to act on it (cost gate, §42). */
+  readonly note?: string;
 }
 
 export interface TransformPlan {

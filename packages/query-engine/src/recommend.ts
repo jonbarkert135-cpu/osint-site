@@ -68,6 +68,8 @@ const REASON_TEXT: Readonly<Record<ExclusionReason, string>> = {
   'budget-exhausted': 'the run budget is already spent',
   'already-covered': 'already run against this entity',
   'over-capacity': 'no free capacity right now',
+  'over-resource-budget': 'too expensive for this scan',
+  'cost-not-justified': 'not worth the cost on this input',
 };
 
 const tierFor = (transform: TransformManifest, usable: boolean): ServiceTier => {
