@@ -1795,6 +1795,21 @@
     margin-inline-start: auto;
   }
 
+  /* Sits under the handle: an escape hatch, not a primary action. */
+  .nx-console-raw {
+    padding: 0 0 var(--nx-space-2);
+    border: 0;
+    background: none;
+    color: var(--fg-secondary);
+    font: var(--text-label);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .nx-console-raw:hover {
+    color: var(--fg-primary);
+  }
+
   .nx-console-arrow {
     display: inline-block;
     transition: transform 180ms ease;

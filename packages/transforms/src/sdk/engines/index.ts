@@ -4,7 +4,8 @@
  * engine in the chain, which is exactly what a fallback chain is for.
  *
  * Only keyless, documented sources live here. Anything needing a credential or a subprocess ships
- * as an integration (`10_INTEGRATIONS.md`), not as a built-in.
+ * as an integration (`10_INTEGRATIONS.md`), not as a built-in — `cli-engines.ts` holds those, and a
+ * host adds them to this map only once it actually has a cli/python adapter to run them with.
  */
 
 import type { EngineId } from '../../types.ts';
@@ -15,6 +16,7 @@ import { createDohResolver } from './doh-resolver.ts';
 import { createRdapLookup } from './rdap-lookup.ts';
 
 export { createCtLogSearch, createDohResolver, createRdapLookup };
+export { adapterEngines, createAmass, createSherlock, createSubfinder } from './cli-engines.ts';
 
 export const BUILTIN_ENGINES: Readonly<Record<EngineId, () => TransformEngine>> = {
   'doh-resolver': createDohResolver,

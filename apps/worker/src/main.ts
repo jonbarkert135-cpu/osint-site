@@ -27,6 +27,15 @@ import {
 } from '@nexus/integrations/github/jobs';
 
 import { createGithubHttp } from './net/github-http.ts';
+import {
+  WATCHER_QUEUE,
+  githubGet,
+  jsonFetch,
+  textFetch,
+  processWatcherJob,
+  registerWatcherSchedule,
+} from './watchers/queue.ts';
+import type { WatcherName } from './watchers/checks.ts';
 import { createGithubHandlerStore, syncNodePatcher } from './stores/github.ts';
 import { processGithubJob, type GithubHandlers, type GithubJobStore } from './queues/github.ts';
 import {
@@ -303,12 +312,44 @@ export function start(): Promise<() => Promise<void>> {
   });
   const githubWorker = startGithubWorker(connection, githubHandlers);
 
-  log.info({ event: 'worker.started' }, 'worker is consuming integration.parse and github');
+  // Registry watchers (Part 2 §7). Read-only: they record drift, a human merges the passport.
+  const watcherQueue = new Queue(WATCHER_QUEUE, { connection });
+  void registerWatcherSchedule(watcherQueue).catch((error: unknown) => {
+    log.warn({ event: 'watch.schedule_failed', error: String(error) }, 'watcher schedule failed');
+  });
+  const watcherWorker = new Worker(
+    WATCHER_QUEUE,
+    async (job: Job) => {
+      const findings = await processWatcherJob(job.name as WatcherName, {
+        github: githubGet,
+        json: jsonFetch,
+        text: textFetch,
+      });
+      const drift = findings.filter((finding) => finding.status === 'drift');
+      log.info(
+        {
+          event: 'watch.finished',
+          watcher: job.name,
+          checked: findings.length,
+          drift: drift.length,
+        },
+        'registry watcher finished',
+      );
+    },
+    { connection, concurrency: 1 },
+  );
+
+  log.info(
+    { event: 'worker.started' },
+    'worker is consuming integration.parse, github and watchers',
+  );
 
   return Promise.resolve(async () => {
     await worker.close();
     await githubWorker.close();
     await githubQueue.close();
+    await watcherWorker.close();
+    await watcherQueue.close();
     connection.disconnect();
     publisher.disconnect();
   });

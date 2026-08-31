@@ -31,6 +31,22 @@ export type FailureCode =
   | 'engine-error'
   | 'contract-violation';
 
+/**
+ * Thrown by an engine that already knows how its run failed. The driver files any other thrown
+ * error as a retryable `engine-error`; this lets a `timeout` or `invalid-input` keep its code so
+ * the retry budget (§30) is not spent on a run that can never succeed.
+ */
+export class EngineFailure extends Error {
+  constructor(
+    readonly code: FailureCode,
+    message: string,
+    readonly retryable = true,
+  ) {
+    super(message);
+    this.name = 'EngineFailure';
+  }
+}
+
 export interface RunFailure {
   readonly code: FailureCode;
   readonly message: string;
@@ -220,11 +236,14 @@ export const runEngine = async (
     }
   } catch (error) {
     if (!controller.signal.aborted) {
-      failure = {
-        code: 'engine-error',
-        message: error instanceof Error ? error.message : String(error),
-        retryable: true,
-      };
+      failure =
+        error instanceof EngineFailure
+          ? { code: error.code, message: error.message, retryable: error.retryable }
+          : {
+              code: 'engine-error',
+              message: error instanceof Error ? error.message : String(error),
+              retryable: true,
+            };
     }
   } finally {
     clearTimeout(timer);
