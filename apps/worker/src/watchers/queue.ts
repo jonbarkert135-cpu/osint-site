@@ -8,7 +8,13 @@
 
 import type { Queue } from 'bullmq';
 
-import { runWatcher, type DriftFinding, type WatcherDeps, type WatcherName } from './checks.ts';
+import {
+  runWatcher,
+  type DriftFinding,
+  type JsonFetch,
+  type WatcherName,
+  type WatcherReaders,
+} from './checks.ts';
 import { appendFindings } from './store.ts';
 import { WATCHED_ENGINES } from './watched.ts';
 
@@ -17,8 +23,10 @@ export const WATCHER_QUEUE = 'registry.watch';
 /** UTC crons, off the hour: nothing else in this deployment runs at 04:40. */
 export const WATCHER_SCHEDULE: Readonly<Record<WatcherName, string>> = {
   'release-watch': '40 4 * * *',
-  'liveness-watch': '40 5 * * 1',
-  'license-watch': '10 6 * * 1',
+  'vuln-watch': '10 5 * * *',
+  'definition-watch': '40 5 * * *',
+  'liveness-watch': '40 6 * * 1',
+  'license-watch': '10 7 * * 1',
 };
 
 /** Anonymous, read-only GitHub JSON. A token lifts the 60 req/h limit when one is configured. */
@@ -39,9 +47,27 @@ export const githubGet = async (path: string): Promise<unknown> => {
   }
 };
 
+/** Read-only JSON over the network, used by the advisory and definition watchers. */
+export const jsonFetch: JsonFetch = async (url, init) => {
+  try {
+    const response = await fetch(url, {
+      ...(init === undefined
+        ? {}
+        : {
+            method: init.method,
+            body: init.body,
+            headers: { 'content-type': 'application/json' },
+          }),
+    });
+    return response.ok ? await response.json() : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 export const processWatcherJob = async (
   name: WatcherName,
-  deps: WatcherDeps,
+  deps: WatcherReaders,
   options: { readonly dir?: string } = {},
 ): Promise<readonly DriftFinding[]> => {
   const findings = await runWatcher(name, WATCHED_ENGINES, deps);

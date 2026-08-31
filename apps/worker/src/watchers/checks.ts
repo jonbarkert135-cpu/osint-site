@@ -11,7 +11,12 @@
 
 import type { WatchedEngine } from './watched.ts';
 
-export type WatcherName = 'release-watch' | 'liveness-watch' | 'license-watch';
+export type WatcherName =
+  | 'release-watch'
+  | 'liveness-watch'
+  | 'license-watch'
+  | 'vuln-watch'
+  | 'definition-watch';
 
 export type DriftSeverity = 'info' | 'review' | 'block';
 
@@ -34,6 +39,9 @@ export interface WatcherDeps {
   readonly github: GithubGet;
   readonly now?: () => Date;
 }
+
+/** Everything a watcher may read. Both readers are injected; nothing here opens its own socket. */
+export type WatcherReaders = WatcherDeps & { readonly json?: JsonFetch };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -200,14 +208,6 @@ export const licenseWatch = async (
       };
 };
 
-export const WATCHERS: Readonly<
-  Record<WatcherName, (engine: WatchedEngine, deps: WatcherDeps) => Promise<DriftFinding>>
-> = {
-  'release-watch': releaseWatch,
-  'liveness-watch': livenessWatch,
-  'license-watch': licenseWatch,
-};
-
 /**
  * Runs one watcher over every engine. Sequential on purpose: watchers are rate-limit-aware and this
  * is a background job with no deadline — hammering GitHub to finish four checks faster is how the
@@ -216,7 +216,7 @@ export const WATCHERS: Readonly<
 export const runWatcher = async (
   name: WatcherName,
   engines: readonly WatchedEngine[],
-  deps: WatcherDeps,
+  deps: WatcherReaders,
 ): Promise<readonly DriftFinding[]> => {
   const check = WATCHERS[name];
   const findings: DriftFinding[] = [];
@@ -224,4 +224,128 @@ export const runWatcher = async (
     findings.push(await check(engine, deps));
   }
   return findings;
+};
+
+/** Injected: any read-only JSON GET/POST the watchers need beyond GitHub. */
+export type JsonFetch = (
+  url: string,
+  init?: { readonly method: string; readonly body: string },
+) => Promise<unknown>;
+
+/** A definition file that changed this much has moved, not drifted (§5.1 "exceeds a threshold"). */
+export const DEFINITION_DRIFT = 0.1;
+
+export const vulnWatch = async (
+  engine: WatchedEngine,
+  deps: WatcherDeps & { readonly json?: JsonFetch },
+): Promise<DriftFinding> => {
+  const at = (deps.now?.() ?? new Date()).toISOString();
+  const source = 'https://api.osv.dev/v1/query';
+  const pkg = engine.pkg;
+  if (pkg === undefined || deps.json === undefined) {
+    return unverified('vuln-watch', engine, at, source, 'no package coordinates for this engine');
+  }
+
+  const body = await deps.json(source, {
+    method: 'POST',
+    body: JSON.stringify({ package: { ecosystem: pkg.ecosystem, name: pkg.name } }),
+  });
+  const vulns = isRecord(body) && Array.isArray(body['vulns']) ? body['vulns'] : undefined;
+  if (vulns === undefined) {
+    return unverified('vuln-watch', engine, at, source, 'OSV did not return a readable answer');
+  }
+  if (vulns.length === 0) {
+    return {
+      watcher: 'vuln-watch',
+      engine: engine.id,
+      at,
+      status: 'ok',
+      severity: 'info',
+      detail: `no OSV advisories for ${pkg.ecosystem}/${pkg.name}`,
+      source,
+    };
+  }
+
+  const ids = vulns
+    .map((vuln) => (isRecord(vuln) ? str(vuln['id']) : undefined))
+    .filter((id): id is string => id !== undefined);
+  return {
+    watcher: 'vuln-watch',
+    engine: engine.id,
+    at,
+    // An advisory against a pinned engine blocks: the pin is the thing the advisory is about.
+    status: 'drift',
+    severity: 'block',
+    detail: `${String(vulns.length)} OSV advisory(ies): ${ids.slice(0, 5).join(', ')}`,
+    source,
+  };
+};
+
+/**
+ * Scraping engines decay silently as sites change (`26` §4). This does not judge the definitions —
+ * it notices that they moved, which is the trigger to re-run the contract tests.
+ */
+export const definitionWatch = async (
+  engine: WatchedEngine,
+  deps: WatcherDeps & { readonly json?: JsonFetch },
+): Promise<DriftFinding> => {
+  const at = (deps.now?.() ?? new Date()).toISOString();
+  const definition = engine.definition;
+  const source = definition?.url ?? 'no definition file';
+  if (definition === undefined || deps.json === undefined) {
+    return unverified('definition-watch', engine, at, source, 'this engine has no definition file');
+  }
+
+  const body = await deps.json(definition.url);
+  if (!isRecord(body)) {
+    return unverified(
+      'definition-watch',
+      engine,
+      at,
+      source,
+      'the definition file could not be read',
+    );
+  }
+
+  const observed = Object.keys(body).length;
+  if (definition.entries === undefined) {
+    return unverified(
+      'definition-watch',
+      engine,
+      at,
+      source,
+      `no baseline recorded; observed ${String(observed)} entries today`,
+    );
+  }
+
+  const delta = Math.abs(observed - definition.entries) / Math.max(definition.entries, 1);
+  return delta > DEFINITION_DRIFT
+    ? {
+        watcher: 'definition-watch',
+        engine: engine.id,
+        at,
+        status: 'drift',
+        severity: 'review',
+        detail: `definitions moved from ${String(definition.entries)} to ${String(observed)} entries — re-run the contract tests`,
+        source,
+      }
+    : {
+        watcher: 'definition-watch',
+        engine: engine.id,
+        at,
+        status: 'ok',
+        severity: 'info',
+        detail: `${String(observed)} entries, within ${String(DEFINITION_DRIFT * 100)}% of the baseline`,
+        source,
+      };
+};
+
+export const WATCHERS: Readonly<
+  Record<WatcherName, (engine: WatchedEngine, deps: WatcherReaders) => Promise<DriftFinding>>
+> = {
+  'release-watch': releaseWatch,
+  'liveness-watch': livenessWatch,
+  'license-watch': licenseWatch,
+  'vuln-watch': vulnWatch,
+  'definition-watch': definitionWatch,
 };

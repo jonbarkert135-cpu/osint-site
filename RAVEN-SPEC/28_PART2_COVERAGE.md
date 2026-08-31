@@ -37,10 +37,11 @@ items — each needs a roadmap entry, not another spec.
 
 1. **Query executor** (§9, §10). `QueryPlan` is fully specified and nothing runs it. Until the
    executor exists, the router, the budget model and the plan-review UI are theory.
-2. **Discovery watchers** (§7). Three of six shipped on 2026-08-31 — `release-watch`,
-   `liveness-watch`, `license-watch` in `apps/worker/src/watchers/`, scheduled and writing dated
-   drift findings. `definition-watch`, `vuln-watch` and `endpoint-watch` remain; until they exist,
-   site-definition rot and advisories still pass unnoticed.
+2. **Discovery watchers** (§7). Five of six shipped on 2026-08-31 — `release-watch`,
+   `liveness-watch`, `license-watch`, `vuln-watch` (OSV) and `definition-watch` in
+   `apps/worker/src/watchers/`, scheduled and writing dated drift findings. Only `endpoint-watch`
+   remains: vendor ToS and pricing pages are prose, so it needs page diffing rather than a JSON
+   reader.
 3. **More adapters** (§8). Two engines is not an ecosystem. The next ones follow the verified Tier-A
    list: subfinder, dnsx, httpx, Sherlock (already passported), then the free public APIs (RDAP,
    DoH, GLEIF, crt.sh) which need no credentials and no container.

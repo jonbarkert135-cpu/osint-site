@@ -30,6 +30,7 @@ import { createGithubHttp } from './net/github-http.ts';
 import {
   WATCHER_QUEUE,
   githubGet,
+  jsonFetch,
   processWatcherJob,
   registerWatcherSchedule,
 } from './watchers/queue.ts';
@@ -318,7 +319,10 @@ export function start(): Promise<() => Promise<void>> {
   const watcherWorker = new Worker(
     WATCHER_QUEUE,
     async (job: Job) => {
-      const findings = await processWatcherJob(job.name as WatcherName, { github: githubGet });
+      const findings = await processWatcherJob(job.name as WatcherName, {
+        github: githubGet,
+        json: jsonFetch,
+      });
       const drift = findings.filter((finding) => finding.status === 'drift');
       log.info(
         {

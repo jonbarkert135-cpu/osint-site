@@ -3,7 +3,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { licenseWatch, livenessWatch, releaseWatch, runWatcher } from '../src/watchers/checks.ts';
+import {
+  definitionWatch,
+  licenseWatch,
+  livenessWatch,
+  releaseWatch,
+  runWatcher,
+  vulnWatch,
+} from '../src/watchers/checks.ts';
 import { appendFindings, findingsFile } from '../src/watchers/store.ts';
 import { WATCHED_ENGINES, type WatchedEngine } from '../src/watchers/watched.ts';
 
@@ -111,5 +118,61 @@ describe('findings store', () => {
 
   it('writes nothing when there is nothing to record', async () => {
     expect(await appendFindings([], { dir: '/nonexistent' })).toBeUndefined();
+  });
+});
+
+describe('vuln-watch (§7)', () => {
+  const pinned: WatchedEngine = {
+    ...engine,
+    pkg: { ecosystem: 'PyPI', name: 'sherlock-project' },
+  };
+  const osv = (body: unknown) => ({ github: async () => undefined, json: async () => body, now });
+
+  it('blocks on any advisory against a pinned engine', async () => {
+    const finding = await vulnWatch(pinned, osv({ vulns: [{ id: 'GHSA-xxxx' }] }));
+    expect(finding).toMatchObject({ status: 'drift', severity: 'block' });
+    expect(finding.detail).toContain('GHSA-xxxx');
+  });
+
+  it('is quiet when OSV knows of none', async () => {
+    expect(await vulnWatch(pinned, osv({ vulns: [] }))).toMatchObject({ status: 'ok' });
+  });
+
+  it('cannot check an engine with no package coordinates', async () => {
+    expect(await vulnWatch(engine, osv({ vulns: [] }))).toMatchObject({ status: 'unverified' });
+  });
+
+  it('records an unreadable answer as unverified, not as clean', async () => {
+    expect(await vulnWatch(pinned, osv(undefined))).toMatchObject({ status: 'unverified' });
+  });
+});
+
+describe('definition-watch (§7)', () => {
+  const withBaseline = (entries?: number): WatchedEngine => ({
+    ...engine,
+    definition: {
+      url: 'https://example.com/data.json',
+      ...(entries === undefined ? {} : { entries }),
+    },
+  });
+  const defs = (body: unknown) => ({ github: async () => undefined, json: async () => body, now });
+  const sites = (count: number) =>
+    Object.fromEntries(Array.from({ length: count }, (_, i) => [i, {}]));
+
+  it('fires when the definitions moved beyond the threshold', async () => {
+    const finding = await definitionWatch(withBaseline(100), defs(sites(80)));
+    expect(finding).toMatchObject({ status: 'drift', severity: 'review' });
+  });
+
+  it('stays quiet inside the threshold', async () => {
+    expect(await definitionWatch(withBaseline(100), defs(sites(95)))).toMatchObject({
+      status: 'ok',
+    });
+  });
+
+  it('reports the observed count when no baseline was ever recorded', async () => {
+    const finding = await definitionWatch(withBaseline(), defs(sites(400)));
+    expect(finding.status).toBe('unverified');
+    expect(finding.detail).toContain('400');
   });
 });

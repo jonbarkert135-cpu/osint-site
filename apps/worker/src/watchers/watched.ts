@@ -16,6 +16,17 @@ export interface WatchedEngine {
   readonly licence: string;
   /** ISO date the two facts above were last read from a primary source. */
   readonly verifiedOn: string;
+  /** Package coordinates for advisory lookups, when the engine ships as one. */
+  readonly pkg?: { readonly ecosystem: string; readonly name: string };
+  /** Scraping engines carry a site-definition file; drift in it is silent decay (§5.1). */
+  readonly definition?: {
+    readonly url: string;
+    /**
+     * Entry count read on `verifiedOn`. Absent means no baseline has been recorded yet: the
+     * watcher then reports the observed count as `unverified` instead of calling it drift.
+     */
+    readonly entries?: number;
+  };
 }
 
 export const WATCHED_ENGINES: readonly WatchedEngine[] = [
@@ -25,6 +36,11 @@ export const WATCHED_ENGINES: readonly WatchedEngine[] = [
     pinnedVersion: 'v0.16.0',
     licence: 'MIT',
     verifiedOn: '2026-08-23',
+    pkg: { ecosystem: 'PyPI', name: 'sherlock-project' },
+    definition: {
+      url: 'https://raw.githubusercontent.com/sherlock-project/sherlock/master/sherlock_project/resources/data.json',
+      // No baseline yet — the first run reports the count it observes, a human records it here.
+    },
   },
   {
     id: 'subfinder',

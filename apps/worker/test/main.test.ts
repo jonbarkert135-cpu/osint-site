@@ -341,7 +341,7 @@ describe('start()', () => {
     await start();
     expect(workerCtor.mock.calls[2]?.[0]).toBe('registry.watch');
     await vi.waitFor(() => {
-      expect(queueAdd.mock.calls.map((call) => call[0])).toEqual(
+      expect((queueAdd.mock.calls as unknown[][]).map((call) => call[0])).toEqual(
         expect.arrayContaining(['release-watch', 'liveness-watch', 'license-watch']),
       );
     });
@@ -363,7 +363,9 @@ describe('start()', () => {
       boardId: 'b1',
       userId: 'u1',
     });
-    const hydrateCall = queueAdd.mock.calls.find((call) => call[0] === 'github.hydrate');
+    const hydrateCall = (queueAdd.mock.calls as unknown[][]).find(
+      (call) => call[0] === 'github.hydrate',
+    );
     expect(hydrateCall).toMatchObject([
       'github.hydrate',
       { nodeId: 'n1' },
