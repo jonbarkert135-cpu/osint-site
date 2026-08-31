@@ -342,3 +342,26 @@ whether a result is new. Each round also emits a one-line headline for the activ
 Honest gaps: no model is wired to `brain` yet, the agent has no UI of its own (a session view with
 rounds, skips and approval prompts is next), approval is per transform per round with no "always
 allow", and frontier selection is confidence-ordered rather than model-ranked.
+
+## Batch: §36, §38 (2026-08-31)
+
+| §   | Point                 | Where                                       | State                         |
+| --- | --------------------- | ------------------------------------------- | ----------------------------- |
+| 36  | Remote engine queue   | `packages/transforms/src/remoteWorker.ts`   | ✅ queue + worker loop        |
+| 38  | Multi-runtime support | `ADAPTER_SUPPORT`, `createGoAdapter`/`Rust` | ✅ 7 of 8 (browser-worker ⚠️) |
+
+**§36.** `createRemoteWorker()` closes the loop `Core → Queue → External Worker → Result API →
+Core`. `claim`, `complete` and `execute` are all injected, so one loop serves the in-process queue
+and a remote Result API without this file knowing which; it holds no transport, timer or process
+API. A throw inside `execute` is recorded as a retryable `internal` failure rather than stopping the
+drain, and `drain(maxJobs)` is bounded. What still does not ship: a deployment — nobody runs the
+worker on a second machine and no HTTP transport is written, so §36 remains test-exercised.
+
+**§38.** `go` and `rust` are now implemented adapters, not planned ones. They are `createCliAdapter`
+with their own runtime label, because a Go binary and a Python image are the same act from the
+core's side (render argv, run it somewhere, read stdout) and the difference is the host's business.
+The runner registers all four (`createEngineAdapters`), routed through the same `ExecutionLayer`, so
+a go/rust engine gets the identical sandbox, egress proxy and limits. `browser-worker` stays
+`planned` on purpose: it needs no process at all and no engine in the registry asks for it.
+
+Unchanged limit: containerized engines still need a pinned image digest before a host may run them.
