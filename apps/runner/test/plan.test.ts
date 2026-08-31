@@ -71,6 +71,15 @@ describe('runner plan host', () => {
     expect(engines.get('doh-resolver')).toBeDefined();
   });
 
+  it('dispatches only what governance enabled (Part 2 §61)', () => {
+    const engines = createHostEngines(adaptersWith([]), registry, new Set(['sherlock']));
+
+    expect(engines.get('sherlock')).toBeDefined();
+    expect(engines.get('subfinder')).toBeUndefined();
+    // Builtins are part of this build and shipped with their own tests; they are not gated here.
+    expect(engines.get('doh-resolver')).toBeDefined();
+  });
+
   it('runs a plan with the host library and returns the investigation', async () => {
     const calls: AdapterInput[] = [];
     const events: string[] = [];

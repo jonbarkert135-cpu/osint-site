@@ -459,3 +459,65 @@ offered as Review/Ignore without an Install it could not honour. **Honest gap:**
 candidates — no release feed, no registry crawl, no model — so the Discovered section reads "no tool
 scan has run in this build yet" rather than showing invented finds, and Install is disabled because
 the app has no package fetcher (the §40 install pipeline judges manifests, it does not download them).
+
+## Batch: §57–§62 (2026-08-31)
+
+| §   | Point              | Where                                         | State                               |
+| --- | ------------------ | --------------------------------------------- | ----------------------------------- |
+| 57  | Deprecation system | `packages/transforms/src/deprecation.ts`      | ✅ verdict + replacement + warning  |
+| 58  | No legacy build-up | `packages/transforms/src/governance.ts`       | ✅ seven requirements, debt list    |
+| 59  | Security first     | `securityReview()` in `src/review.ts`         | ✅ gate in the §40 install pipeline |
+| 60  | Legal / licence    | `licenceReview()` in `src/review.ts`          | ✅ gate in the §40 install pipeline |
+| 61  | Safe defaults      | `installEngine()` + `integrationGovernance()` | ✅ installs land disabled           |
+| 62  | Testing of engines | `src/sdk/conformance.ts`                      | ✅ eight kinds, coverage map        |
+
+**§57.** `assessDeprecation()` judges an engine against signals the host collected — last release,
+archived upstream, an upstream notice, unfixed advisories, the observed failure rate, a newer version
+— and returns one of four verdicts. Hard facts (`archived`, an upstream notice, a `deprecated`
+manifest, three years without a release) give `deprecated`; the soft ones accumulate into
+`suspected`. An engine nobody has any signal for is **`unverified`, never `active`**: a clean bill of
+health that nothing checked is the failure mode this section exists to prevent. When the verdict is
+bad the registry is searched for a replacement covering the same capability, and the candidate is
+only offered with a stated advantage from §57's own vocabulary (active maintenance / newer runtime /
+better API / higher compatibility) — "use this other thing, no idea why" helps nobody. The catalogue
+(§55) takes the verdicts as input, so an engine whose upstream died shows as deprecated even while
+its manifest still says `stable`. **Gap:** nothing populates the signals yet; the release, liveness
+and vuln watchers in `apps/worker/src/watchers/` write drift findings, and wiring those into
+`DeprecationSignals` is the next step.
+
+**§58.** Seven questions per integration — owner, adapter, compatibility, version, tests, health
+check, deprecation policy. Four are derived from what the repo already knows; the other three
+(owner, tests that really ran, deprecation policy) are statements a human makes, and arrive as an
+`IntegrationRecord`. An engine with no record is not assumed to be fine: it appears in
+`governanceReport().debt` with each missing requirement named, and in `unowned`. There is
+deliberately no hand-written ledger for the 37 catalogue engines — inventing owners and test claims
+for engines that have neither would defeat the point of the section.
+
+**§59/§60.** `securityReview()` and `licenceReview()` are pure functions over a declaration the
+caller assembled from a package manifest, an SBOM, an OSV query and a licence scan. Security checks
+the execution model, third-party code execution, subprocess use, filesystem writes outside the
+workdir, network egress, secrets, ungranted permissions and advisories; a project that runs foreign
+code is refused unless it is containerized. Licence checks the SPDX id against the workspace policy,
+commercial compatibility, attribution, redistribution and **every dependency licence**. Both treat
+an absent fact as unverified, and unverified never resolves in the candidate's favour — an unlicensed
+project is refused, because being public on GitHub grants no rights. Both are wired into the §40
+install pipeline as its licence and security gates; without a declaration those gates fall back to
+the manifest alone and say so in `pending`.
+
+**§61.** `installEngine()` now returns `enabled: false` — always — plus a `pending` list. Compatibility,
+security, licence and the health check are the gates the pipeline runs, and passing them makes an
+engine _installable_, not _enabled_: `integrationGovernance()` flips the state only when the review
+verdicts are `pass` and a health check passed inside the freshness window (30 days by default). The
+runner enforces it at the dispatch seam — `createHostEngines(adapters, catalog, enabled)` hands the
+executor only the enabled ids, so a disabled engine reports `engine-unavailable` exactly like a
+missing adapter. Builtin SDK engines are part of this build, ship with their own tests and are not
+gated.
+
+**§62.** The conformance harness gained the three kinds it was missing: a **timeout** test (a deadline
+shorter than the provider's answer must end as `timeout` with partial results kept), a **failure**
+test (with nothing mocked every request rejects — the engine must report it, not throw, and must not
+claim exhaustiveness) and a **duplicate-handling** test (the same chunks twice must not become the
+same entity twice). `conformanceCoverage(report)` maps passed checks onto the eight §62 kinds —
+unit, integration, adapter, health, timeout, failure, normalization, duplicates — so the governance
+ledger's `tests` field is evidence from a run rather than a claim in a manifest. All three shipped SDK
+engines (doh-resolver, rdap-lookup, ct-log-search) cover all eight.

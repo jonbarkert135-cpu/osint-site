@@ -177,3 +177,91 @@ describe('engineDocument (Part 2 §39)', () => {
     expect(doc.provider.credentials).toBe('required');
   });
 });
+
+describe('installEngine safe defaults and reviews (Part 2 §59–§61)', () => {
+  const project = {
+    id: 'engine-b',
+    version: '1.0.0',
+    licence: 'MIT',
+    dependencies: [{ name: 'lib', licence: 'MIT' }],
+    advisories: [],
+    executionModel: 'remote-api' as const,
+    permissions: ['network' as const],
+    redistribution: 'permitted' as const,
+  };
+
+  it('never enables what it installs, and says what is still pending (§61)', async () => {
+    const result = await installEngine(
+      registry,
+      { engine: newEngine(), provider: newProvider() },
+      ctx({ project, licencePolicy: { allowed: new Set(['MIT']), commercial: true } }),
+    );
+
+    expect(result.installed).toBe(true);
+    expect(result.enabled).toBe(false);
+    expect(result.pending).toContain(
+      'governance: record an owner, the §62 test kinds and a deprecation policy (§58)',
+    );
+  });
+
+  it('admits when nothing but the manifest was checked', async () => {
+    const result = await installEngine(
+      registry,
+      { engine: newEngine(), provider: newProvider() },
+      ctx(),
+    );
+
+    expect(result.pending).toEqual([
+      'licence: only the provider manifest was checked; no dependency licence scan ran',
+      'security: no execution-model, dependency or vulnerability review was supplied',
+      'governance: record an owner, the §62 test kinds and a deprecation policy (§58)',
+    ]);
+  });
+
+  it('fails the licence gate on a dependency with no stated licence (§60)', async () => {
+    const result = await installEngine(
+      registry,
+      { engine: newEngine(), provider: newProvider() },
+      ctx({
+        project: { ...project, dependencies: [{ name: 'vendored', licence: 'unknown' }] },
+        licencePolicy: { allowed: new Set(['MIT']), commercial: true },
+      }),
+    );
+
+    expect(result.installed).toBe(false);
+    expect(step(result, 'licence')?.status).toBe('failed');
+    expect(step(result, 'licence')?.detail).toContain('states no licence');
+  });
+
+  it('fails the security gate on a project that runs third-party code (§59)', async () => {
+    const result = await installEngine(
+      registry,
+      { engine: newEngine(), provider: newProvider() },
+      ctx({
+        project: { ...project, runsUntrustedCode: true },
+        licencePolicy: { allowed: new Set(['MIT']), commercial: true },
+      }),
+    );
+
+    expect(result.installed).toBe(false);
+    expect(step(result, 'security')?.status).toBe('failed');
+    expect(step(result, 'security')?.detail).toContain('executes third-party code');
+  });
+
+  it('installs a project whose review only warns, and carries the warning into pending', async () => {
+    const result = await installEngine(
+      registry,
+      { engine: newEngine(), provider: newProvider() },
+      ctx({
+        project: {
+          ...project,
+          advisories: [{ id: 'GHSA-9', severity: 'high' as const, fixedIn: '1.1.0' }],
+        },
+        licencePolicy: { allowed: new Set(['MIT']), commercial: true },
+      }),
+    );
+
+    expect(result.installed).toBe(true);
+    expect(result.pending.some((entry) => entry.includes('GHSA-9'))).toBe(true);
+  });
+});

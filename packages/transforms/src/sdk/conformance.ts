@@ -7,7 +7,9 @@
  * developer-mode UI (L4.6) without dragging a test runner into the package.
  */
 
+import { ENGINE_TEST_KINDS, type EngineTestKind } from '../governance.ts';
 import type { EngineManifest, EntityKind } from '../types.ts';
+import { validateOutput } from './run.ts';
 import { createTestHost, type MockResponse } from './testkit.ts';
 import type { EngineContext, TransformEngine, TransformInput } from './types.ts';
 
@@ -195,6 +197,54 @@ export const runConformance = async (
       latency <= GRACE_MS,
       `execute settled ${latency} ms after abort`,
     );
+
+    // §62 duplicate handling: the same chunk twice must not become the same entity twice. The
+    // driver treats a duplicate key as a contract violation, so an engine that concatenates
+    // blindly fails here instead of in an investigation.
+    const doubled = engine.normalize([...outcome.chunks, ...outcome.chunks], fixture.input);
+    add(
+      `handles-duplicate-chunks:${label}`,
+      validateOutput(doubled, true, meta.permissions.includes('network')).every(
+        (violation) => !violation.startsWith('duplicate entity key'),
+      ) && doubled.entities.length === first.entities.length,
+      `${doubled.entities.length} entities from doubled chunks vs ${first.entities.length}`,
+    );
+
+    // §62 failure test: with nothing mocked, every request rejects. A correct engine reports the
+    // failure (or says it did not see everything) — it never throws and never claims completeness.
+    if (meta.permissions.includes('network')) {
+      const offline = createTestHost();
+      let threw = '';
+      let failed = false;
+      try {
+        const broken = await offline.run(engine, fixture.input);
+        failed =
+          broken.failure !== undefined ||
+          broken.exhaustive === false ||
+          broken.status !== 'completed';
+      } catch (error) {
+        threw = error instanceof Error ? error.message : String(error);
+      }
+      add(
+        `reports-network-failure:${label}`,
+        threw === '' && failed,
+        threw === '' ? `failure reported` : `threw: ${threw}`,
+      );
+
+      // §62 timeout test: a deadline shorter than the provider's response must end as `timeout`,
+      // with whatever was collected kept (brief §82–83).
+      const slow = await createTestHost({ deadlineMs: 5 }).run(engine, fixture.input, {
+        fetch: async (url, init) => {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          return host.fetch(url, init);
+        },
+      });
+      add(
+        `honours-deadline:${label}`,
+        slow.failure?.code === 'timeout' && slow.exhaustive === false,
+        `status=${slow.status} code=${slow.failure?.code ?? 'none'}`,
+      );
+    }
   }
 
   if (engine.healthCheck) {
@@ -220,6 +270,40 @@ export const runConformance = async (
   }
 
   return { engine: meta.engine, passed: checks.every((check) => check.ok), checks };
+};
+
+/**
+ * Which §62 test kind each family of checks proves. `unit` is the contract-level checks the harness
+ * runs without a host; `adapter` is the manifest/metadata agreement that an adapter depends on.
+ */
+const COVERAGE: Readonly<Record<EngineTestKind, readonly string[]>> = {
+  unit: ['rejects-invalid-input', 'declares-input-and-output-kinds'],
+  integration: ['fixture-completes', 'fixture-yields-results'],
+  adapter: ['metadata-matches-manifest'],
+  health: ['health-check-shape'],
+  timeout: ['honours-deadline'],
+  failure: ['reports-network-failure'],
+  normalization: ['normalize-is-pure', 'outputs-within-declared-kinds'],
+  duplicates: ['handles-duplicate-chunks'],
+};
+
+/**
+ * The §62 test kinds a report actually exercised, plus the ones it did not. Feeds the governance
+ * ledger (§58): "tests" is a fact from a run, never a claim in a manifest.
+ */
+export const conformanceCoverage = (
+  report: ConformanceReport,
+): { readonly covered: readonly EngineTestKind[]; readonly missing: readonly EngineTestKind[] } => {
+  const passed = report.checks.filter((check) => check.ok).map((check) => check.id);
+  const covered = ENGINE_TEST_KINDS.filter((kind) =>
+    COVERAGE[kind].some((prefix) =>
+      passed.some((id) => id === prefix || id.startsWith(`${prefix}:`)),
+    ),
+  );
+  return {
+    covered,
+    missing: ENGINE_TEST_KINDS.filter((kind) => !covered.includes(kind)),
+  };
 };
 
 /** One-line summary of the failures, for a CI log or a PR comment. */

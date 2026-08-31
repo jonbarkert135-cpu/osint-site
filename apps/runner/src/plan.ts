@@ -39,12 +39,23 @@ export const createHostAdapters = (deps: EngineAdapterDeps): AdapterRegistry => 
 export const createHostEngines = (
   adapters: AdapterRegistry,
   catalog: TransformRegistry = createCatalogRegistry(),
-): EngineLibrary =>
-  createEngineLibrary({ ...BUILTIN_ENGINES, ...registryEngines(adapters, catalog) });
+  enabled?: ReadonlySet<string>,
+): EngineLibrary => {
+  const registered = registryEngines(adapters, catalog);
+  // Part 2 §61: an engine that governance has not enabled is simply not dispatchable here. It stays
+  // in the catalogue with its reason (§55/§58); the executor reports `engine-unavailable` for it,
+  // which is the same honest outcome as a missing adapter.
+  const allowed = enabled
+    ? Object.fromEntries(Object.entries(registered).filter(([id]) => enabled.has(id)))
+    : registered;
+  return createEngineLibrary({ ...BUILTIN_ENGINES, ...allowed });
+};
 
 export interface HostPlanDeps extends Omit<ExecuteDeps, 'engines' | 'registry'> {
   readonly adapters: AdapterRegistry;
   readonly registry?: TransformRegistry;
+  /** §61: engine ids governance has enabled. Omitted means "every adapter-backed engine". */
+  readonly enabledEngines?: ReadonlySet<string>;
   /** Called for each event, so a caller can stream progress without re-implementing the drain. */
   readonly onEvent?: (event: QueryEvent) => void;
 }
@@ -57,11 +68,11 @@ export const runHostPlan = async (
   plan: QueryPlan,
   deps: HostPlanDeps,
 ): Promise<InvestigationResult> => {
-  const { adapters, registry = createCatalogRegistry(), onEvent, ...rest } = deps;
+  const { adapters, registry = createCatalogRegistry(), onEvent, enabledEngines, ...rest } = deps;
   const stream = executePlan(plan, {
     ...rest,
     registry,
-    engines: createHostEngines(adapters, registry),
+    engines: createHostEngines(adapters, registry, enabledEngines),
   });
   for (;;) {
     const step = await stream.next();
