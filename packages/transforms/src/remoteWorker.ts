@@ -16,7 +16,7 @@ export interface RemoteWorkerTransport {
   /** Ask the queue for work. Returns null when there is nothing to take. */
   readonly claim: (workerId: string) => Promise<RemoteJob | null> | RemoteJob | null;
   /** Post the result back to the Result API. */
-  readonly complete: (jobId: string, result: AdapterResult) => Promise<unknown> | void;
+  readonly complete: (jobId: string, result: AdapterResult) => unknown;
 }
 
 export interface RemoteWorkerOptions {
