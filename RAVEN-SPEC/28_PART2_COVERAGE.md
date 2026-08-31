@@ -521,3 +521,37 @@ same entity twice). `conformanceCoverage(report)` maps passed checks onto the ei
 unit, integration, adapter, health, timeout, failure, normalization, duplicates — so the governance
 ledger's `tests` field is evidence from a run rather than a claim in a manifest. All three shipped SDK
 engines (doh-resolver, rdap-lookup, ct-log-search) cover all eight.
+
+---
+
+## Batch: the queue speaks HTTP, and something finally asks for a plan (§36, §37)
+
+Two gaps this file has been carrying since the remote-execution batch, both of the same shape: the
+mechanism existed, nothing production called it.
+
+**§36 over HTTP.** `packages/transforms/src/httpQueue.ts` gives the queue a transport, and it is the
+smallest one that works: `createHttpWorkerTransport()` on the worker side (claim, post the result)
+and `handleQueueRequest()` on the core side, a pure `(queue, request) → {status, body}` router a
+host mounts on the server it already runs. No framework, no client library, `fetch` injected — the
+file stays in the browser-safe bundle (N2) and the queue's own rules stay where they were: an empty
+queue answers `200 null` (nothing to do is an answer), a job the queue no longer accepts answers
+`409` so a worker is never told its result was recorded when it was not, and a refused or malformed
+response makes the worker report "no work" rather than stop draining (U5). The two halves are tested
+against each other over a loopback fetch, because a transport tested only against a stub is a
+transport that agrees with itself.
+
+**The plan trigger.** `PLAN_QUEUE` (`query.plan`) plus `zPlanJob` in the runner protocol, and
+`runPlanJob()` in `apps/runner/src/plan.ts`: a queue message now asks the host to plan and execute a
+query. The message carries the query, the mode and the granted permissions rather than a plan — there
+is no plan table, and a plan derived at claim time cannot be one the previous release built. The
+runner never widens permissions (N4), so an engine that needs `subprocess` is simply not planned when
+the org did not grant it. `runPlanQueueJob()` in `main.ts` builds the host adapters over the same
+container executor, sandbox flags and egress proxy every integration run gets (N5, one door), streams
+`QueryEvent`s onto the existing run channel so a UI can follow a plan exactly like a run, and reads
+engine stdout back through `s3Read()`. Engine network access goes through `nodeHostFetch`, i.e.
+`safeFetch` — an engine cannot reach the metadata service any more than an integration can.
+
+Still open, and stated rather than papered over: no deployment runs the external worker on a second
+machine (the transport exists; the second machine does not), containerized engines still have no
+pinned image digest, and nothing enqueues `query.plan` from the web app yet — the queue is the
+contract, the caller is the next batch.

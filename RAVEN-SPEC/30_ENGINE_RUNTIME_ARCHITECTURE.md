@@ -164,12 +164,14 @@ run console (§24).
 2. Both halves now live in one process: `apps/runner/src/plan.ts` registers the host's four
    adapters, builds the engine library with `registryEngines()` and runs a plan through
    `executePlan`. The browser keeps its builtin-only library by design (N2). What is still missing
-   is the trigger — no queue message asks the runner for a plan yet, so the host is called by tests
-   and by an embedder, not by the product. The containerized engines also still have no pinned image
-   digest (`13_SHERLOCK.md` §1.2).
-3. The external worker loop ships (`packages/transforms/src/remoteWorker.ts`) but no deployment
-   does: nothing in the repo runs it on a second machine, and no HTTP transport is written, so §36
-   is still exercised by tests rather than in production.
+   is a caller: the runner now consumes `query.plan` (`zPlanJob`, `runPlanJob`/`runPlanQueueJob`),
+   so a queue message asks this host for a plan and the events land on the run channel — but nothing
+   in the web app enqueues one yet. The containerized engines also still have no pinned image digest
+   (`13_SHERLOCK.md` §1.2).
+3. The external worker loop ships (`packages/transforms/src/remoteWorker.ts`) and now has a
+   transport — `httpQueue.ts`: `createHttpWorkerTransport()` for the worker, `handleQueueRequest()`
+   as the Result API the core mounts. What is still missing is a deployment: nothing in the repo
+   runs a worker on a second machine, so §36 is wired end to end in tests but not in production.
 4. Footprints for derived passports are conservative defaults, not measurements. Real numbers come
    from running the engines under the resource manager (`29` §6) and recording what they use.
 

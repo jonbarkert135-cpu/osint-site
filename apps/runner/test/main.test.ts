@@ -94,14 +94,20 @@ vi.mock('../src/sandbox/secrets.ts', async (importOriginal) => ({
   materializeSecrets: () => Promise.resolve({ env: { TOKEN: 'shhh' }, cleanup: secretsCleanup }),
 }));
 
+// The host fetch is stubbed: a plan job must not put real DNS and sockets into a unit test. A
+// 503 is an honest answer here — what is asserted is the wiring, not what an engine found.
+vi.mock('../src/net.ts', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  nodeHostFetch: () => Promise.resolve({ status: 503, body: null }),
+}));
+
 const sweep = vi.fn((_options: unknown) => Promise.resolve());
 vi.mock('../src/reaper.ts', () => ({ sweep }));
 
 const { builtinRegistry } = await import('@nexus/integrations');
-const { PARSE_QUEUE, RUN_QUEUE } = await import('../src/protocol.ts');
-const { prismaReaperStore, prismaRunLogStore, runJob, s3Sink, start } = await import(
-  '../src/main.ts'
-);
+const { PARSE_QUEUE, PLAN_QUEUE, RUN_QUEUE } = await import('../src/protocol.ts');
+const { prismaReaperStore, prismaRunLogStore, runJob, runPlanQueueJob, s3Read, s3Sink, start } =
+  await import('../src/main.ts');
 
 const env = { S3_ENDPOINT: 'https://s3.test/', S3_BUCKET: 'raven' } as Parameters<typeof s3Sink>[0];
 
@@ -427,5 +433,86 @@ describe('start()', () => {
     expect(execute).toHaveBeenCalled();
 
     await stop();
+  });
+});
+
+describe('plan queue (§36/§37)', () => {
+  const planDeps = () => {
+    const redis = {
+      publish: vi.fn(() => Promise.resolve(1)),
+      get: vi.fn(() => Promise.resolve(null)),
+      set: vi.fn(() => Promise.resolve('OK')),
+    };
+    const subscriber = {
+      subscribe: vi.fn(() => Promise.resolve(1)),
+      unsubscribe: vi.fn(() => Promise.resolve(1)),
+      on: vi.fn(),
+      off: vi.fn(),
+    };
+    return {
+      redis,
+      subscriber,
+      parseQueue: { add: queueAdd },
+      sink: { put: vi.fn(() => Promise.resolve()) },
+      bucket: 'raven',
+      proxyUrl: 'http://egress:3128',
+      readArtifact: () => Promise.resolve(''),
+    } as unknown as Parameters<typeof runPlanQueueJob>[0] & {
+      redis: { publish: ReturnType<typeof vi.fn> };
+    };
+  };
+
+  it('plans the query on this host and streams the events on the run channel', async () => {
+    const deps = planDeps();
+    await runPlanQueueJob(deps, {
+      runId: 'plan-1',
+      orgId: 'org-1',
+      query: 'example.com',
+      permissions: ['network'],
+    });
+
+    const published = deps.redis.publish.mock.calls.map(
+      (call) => JSON.parse(String(call[1])) as { type: string },
+    );
+    expect(deps.redis.publish.mock.calls[0]?.[0]).toBe('run:plan-1');
+    expect(published[0]?.type).toBe('plan.started');
+    expect(published.at(-1)?.type).toBe('plan.done');
+    // A container is only built for a plan that reaches an adapter-backed engine; the sandbox it
+    // would use is the same one every run gets.
+    expect(containerExecutor.mock.lastCall?.[0]).toMatchObject({ orgId: 'org-1' });
+  });
+
+  it('refuses a job that does not carry a query', async () => {
+    await expect(
+      runPlanQueueJob(planDeps(), { runId: 'plan-1', orgId: 'org-1' }),
+    ).rejects.toThrow();
+  });
+
+  it('reads an artifact back as the engine stdout', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve('sub.example.com') })
+      .mockResolvedValueOnce({ ok: false, status: 404 });
+    vi.stubGlobal('fetch', fetchMock);
+    const read = s3Read(env);
+    const ref = { bucket: 'raven', key: 'runs/a.txt' } as Parameters<typeof read>[0];
+
+    await expect(read(ref)).resolves.toBe('sub.example.com');
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://s3.test/raven/runs/a.txt');
+    await expect(read(ref)).rejects.toThrow('404');
+    vi.unstubAllGlobals();
+  });
+
+  it('consumes the plan queue one job at a time', async () => {
+    const stop = await start();
+    const planCall = workerCtor.mock.calls.find((call) => call[0] === PLAN_QUEUE);
+
+    expect(planCall?.[2]).toMatchObject({ concurrency: 1 });
+    await expect(
+      (planCall?.[1] as (job: unknown) => Promise<void>)({ id: 'p1', data: {} }),
+    ).rejects.toThrow();
+
+    await stop();
+    expect(workerClose).toHaveBeenCalled();
   });
 });

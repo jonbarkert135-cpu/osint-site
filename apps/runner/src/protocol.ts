@@ -10,6 +10,8 @@ import { z } from 'zod';
 
 export const RUN_QUEUE = 'integration.run';
 export const PARSE_QUEUE = 'integration.parse';
+/** Part 2 §36/§37: asks the runner to plan and execute one query on the host adapters. */
+export const PLAN_QUEUE = 'query.plan';
 
 export const zRunJob = z.object({
   runId: z.string().min(1),
@@ -26,6 +28,26 @@ export const zParseJob = z.object({
 });
 
 export type ParseJob = z.infer<typeof zParseJob>;
+
+/**
+ * A plan job carries the query itself rather than a row id: there is no plan table, and a plan is
+ * derived from the registry at claim time, so nothing here can go stale over a deploy the way run
+ * limits can. Permissions are stated by the caller — the runner never widens them (N4).
+ */
+export const zPlanJob = z.object({
+  runId: z.string().min(1),
+  orgId: z.string().min(1),
+  query: z.string().min(1),
+  mode: z
+    .enum(['strict-local', 'zero-credential', 'free-tier', 'configured', 'maximum-coverage'])
+    .default('zero-credential'),
+  permissions: z
+    .array(z.enum(['network', 'filesystem', 'subprocess', 'credentials', 'browser']))
+    .default([]),
+  depth: z.union([z.literal(1), z.literal(2), z.literal('deep')]).optional(),
+});
+
+export type PlanJob = z.infer<typeof zPlanJob>;
 
 /** BullMQ options for both queues: we retry explicitly (§11.3), never blindly. */
 export const JOB_OPTIONS = {

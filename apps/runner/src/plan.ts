@@ -16,6 +16,7 @@ import { BUILTIN_ENGINES, registryEngines } from '@nexus/transforms/sdk';
 import {
   createEngineLibrary,
   executePlan,
+  planQuery,
   type EngineLibrary,
   type ExecuteDeps,
   type InvestigationResult,
@@ -23,6 +24,7 @@ import {
   type QueryPlan,
 } from '@nexus/query-engine';
 import { createEngineAdapters, type EngineAdapterDeps } from './executors/engineAdapters.ts';
+import { zPlanJob } from './protocol.ts';
 
 /** The adapters this process can serve, registered by runtime. */
 export const createHostAdapters = (deps: EngineAdapterDeps): AdapterRegistry => {
@@ -79,4 +81,38 @@ export const runHostPlan = async (
     if (step.done === true) return step.value;
     onEvent?.(step.value);
   }
+};
+
+/**
+ * The trigger (§36/§37): a queue message asks this host for a plan. Until now the host was called
+ * by tests and by an embedder only; this is the entry point the product uses.
+ *
+ * The plan is derived here rather than carried in the message, so a message that sat in Redis over
+ * a deploy cannot execute a plan built by the previous release (the reason `zRunJob` carries ids
+ * only). Permissions come from the caller and are never widened: an engine that needs `subprocess`
+ * is simply not planned when the org did not grant it (N4).
+ */
+export const runPlanJob = async (
+  raw: unknown,
+  deps: Omit<HostPlanDeps, 'mode'>,
+): Promise<InvestigationResult> => {
+  const job = zPlanJob.parse(raw);
+  const registry = deps.registry ?? createCatalogRegistry();
+  const plan = planQuery(
+    registry,
+    job.query,
+    {
+      mode: job.mode,
+      configuredProviders: new Set<string>(),
+      grantedPermissions: new Set(job.permissions),
+    },
+    job.depth === undefined ? {} : { depth: job.depth },
+  );
+
+  return runHostPlan(plan, {
+    ...deps,
+    registry,
+    mode: job.mode,
+    runId: () => job.runId,
+  });
 };
