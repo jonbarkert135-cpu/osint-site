@@ -389,6 +389,15 @@ per-step cost gate in `packages/transforms/src/cost.ts`. Design, boundaries and 
 live in `28_PART2_COVERAGE.md`, batch §42–§44. Open question 3 below is now partly answered in
 data: Deep Scan is the preset that admits minute-scale runs, and its budget states the ceiling.
 
+## 14b. Workflow editor and the research agent (Part 2 §45–§50)
+
+Shipped 2026-08-31: `builder.ts` (the visual editor's model — a workflow is drawn on a canvas and
+compiled back), `apps/web/src/query/WorkflowPanel.tsx` (the editor and the re-run surface, opened
+from the palette as _Workflows…_), `workflowStore.ts` (local-first saved workflows) and `agent.ts`
+(the Research Orchestrator Agent: guardrails, the observe→plan→execute→collect→evaluate→decide
+loop, and graph memory). The full design, including the safety boundaries, lives in
+`31_RESEARCH_AGENT.md`; the coverage table is in `28_PART2_COVERAGE.md`, batch §45–§50.
+
 ---
 
 ## 15. Open questions (to resolve inside P17, not before)

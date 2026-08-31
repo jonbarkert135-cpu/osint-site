@@ -50,6 +50,7 @@ import { captureTransfer, usePaste, type CaptureResult } from '../../capture/use
 import { useDropZone } from '../../capture/useDropZone.ts';
 import { useCopyCut } from '../../capture/useCopyCut.ts';
 import { AskPanel } from '../../query/AskPanel.tsx';
+import { WorkflowPanel } from '../../query/WorkflowPanel.tsx';
 import { GroupsPanel } from './GroupsPanel.tsx';
 import { LayersPanel } from './LayersPanel.tsx';
 import { exportGroup, groupSelected, labelOf, ungroupSelected } from './groupCommands.ts';
@@ -114,6 +115,7 @@ export function BoardWorkspace() {
   const [aiOpen, setAiOpen] = useState(false);
   const [groupsOpen, setGroupsOpen] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
+  const [workflowsOpen, setWorkflowsOpen] = useState(false);
   const [layersOpen, setLayersOpen] = useState(false);
 
   // Auto Arrange is ephemeral UI state, never document state (P14a, N2).
@@ -494,6 +496,14 @@ export function BoardWorkspace() {
           run: () => setAskOpen(true),
         },
         {
+          id: 'board.workflows',
+          title: 'Workflows…',
+          group: 'board' as const,
+          keywords: ['workflow', 'pipeline', 'automation', 'saved', 'repeat', 'editor'],
+          when: (ctx: { view: string }) => ctx.view === 'board',
+          run: () => setWorkflowsOpen(true),
+        },
+        {
           id: 'board.export',
           title: 'Export board…',
           group: 'board' as const,
@@ -869,6 +879,13 @@ export function BoardWorkspace() {
         doc={doc}
         boardId={boardId}
         onUndo={() => history.undo()}
+      />
+
+      <WorkflowPanel
+        open={workflowsOpen}
+        onClose={() => setWorkflowsOpen(false)}
+        doc={doc}
+        boardId={boardId}
       />
 
       <GroupsPanel

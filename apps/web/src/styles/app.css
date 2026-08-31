@@ -1526,6 +1526,54 @@
     margin-top: var(--space-3, 12px);
   }
 
+  /* The visual workflow editor (Part 2 §45): the pipeline is read left to right, arrows behind. */
+  .nx-workflow-canvas {
+    position: relative;
+    max-inline-size: 100%;
+    overflow: auto;
+    margin-top: var(--space-3, 12px);
+    color: var(--border-strong, rgb(255 255 255 / 35%));
+  }
+
+  .nx-workflow-arrows {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .nx-workflow-node {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    display: grid;
+    align-content: center;
+    gap: 2px;
+    padding: var(--space-2, 8px);
+    text-align: start;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--nx-radius-2, 6px);
+    background: var(--surface-2, rgb(255 255 255 / 4%));
+    color: inherit;
+    font-size: var(--text-body-sm, 13px);
+    cursor: pointer;
+  }
+
+  .nx-workflow-node[aria-pressed='true'] {
+    border-color: var(--accent-9, #6ea8fe);
+  }
+
+  .nx-workflow-node[data-stage='transform'] {
+    border-style: solid;
+  }
+
+  .nx-workflow-node[data-stage='input'],
+  .nx-workflow-node[data-stage='graph'],
+  .nx-workflow-node[data-stage='ai-summary'],
+  .nx-workflow-node[data-stage='entity-resolution'],
+  .nx-workflow-node[data-stage='normalize'] {
+    border-style: dashed;
+  }
+
   .nx-ask-run {
     list-style: none;
     margin: var(--space-3, 12px) 0 0;
