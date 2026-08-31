@@ -103,16 +103,31 @@ is actually wired is a separate, honest table — `ADAPTER_SUPPORT`:
 
 | Runtime                               | Adapter     |
 | ------------------------------------- | ----------- |
-| node, http, external-api              | implemented |
-| cli, python, go, rust, browser-worker | planned     |
+| node, http, external-api, cli, python | implemented |
+| go, rust, browser-worker              | planned     |
 
-The architecture is ready for all eight; the UI says "adapter planned" for the five that are not,
+The architecture is ready for all eight; the UI says "adapter planned" for the three that are not,
 rather than failing at run time.
+
+`cli` and `python` are one implementation (`src/cliAdapter.ts`): from the core's side both are
+"render argv, run it somewhere, read stdout", and the difference between a Go binary and a Python
+image is the host's business, not the core's. The adapter therefore imports no process API at all —
+the host injects `spawn`. That is what keeps `@nexus/transforms` importable from the browser bundle
+(N2) and keeps the single sanctioned process door inside the runner's container executor (N5).
+
+stdout is parsed as JSON lines, one JSON document, or plain lines — the three shapes that cover
+subfinder/httpx/dnsx, API-style tools and Sherlock. Failures are typed rather than swallowed:
+`timeout`, `unavailable`, `invalid-input` (the payload could not be rendered as argv), `upstream`
+(non-zero exit; retryable only when the process was killed) and `internal`. Progress is reported as
+`fraction: null` — a CLI does not know its own percentage and inventing one would put a lie into the
+run console (§24).
 
 ## 7. Gaps
 
-1. The `cli` / `python` adapters are not written — the containerized engines (amass, sherlock,
-   subfinder) therefore still cannot execute, they are only correctly classified and limited.
+1. The `cli` / `python` adapters exist and are tested, but nothing binds them to the host yet: the
+   `spawn` implementation on top of the runner's container executor (the only sanctioned process
+   door) is the next step. Until it lands, amass/sherlock/subfinder are classified, limited and
+   dispatchable in principle, not executed.
 2. No external worker implementation ships with the repo; the queue is exercised by tests only.
 3. Footprints for derived passports are conservative defaults, not measurements. Real numbers come
    from running the engines under the resource manager (`29` §6) and recording what they use.

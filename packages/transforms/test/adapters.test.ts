@@ -64,14 +64,14 @@ describe('canDispatch', () => {
 
   it('distinguishes a planned adapter from a missing one', () => {
     const engine = makeEngine({
-      id: 'cli-thing',
+      id: 'browser-thing',
       capability: 'c',
       provider: 'p',
-      permissions: ['network', 'subprocess'],
+      permissions: ['browser'],
     });
     expect(canDispatch(new AdapterRegistry(), engine)).toEqual({
       reason: 'adapter-planned',
-      runtime: 'cli',
+      runtime: 'browser-worker',
     });
   });
 
