@@ -19,5 +19,6 @@ export * from './remote.ts';
 export * from './remoteWorker.ts';
 export * from './cliAdapter.ts';
 export * from './queueAdapter.ts';
+export * from './httpQueue.ts';
 export { createCatalogRegistry } from './catalog/index.ts';
 export * from './sdk/index.ts';

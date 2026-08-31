@@ -20,18 +20,29 @@ import {
   networkPolicyOf,
   payloadFor,
   toErrorPayload,
+  type ArtifactRef,
   type ExecutionLayer,
   type ExecutionRequest,
   type RawRunResult,
 } from '@nexus/integrations';
 
 import type { ArtifactSink } from './artifacts.ts';
+import { runPlanJob, createHostAdapters } from './plan.ts';
 import { watchCancel, type CancelBackend } from './cancel.ts';
 import { createBuiltinExecutor } from './executors/builtin.ts';
 import { createContainerExecutor, dockerRuntime } from './executors/container.ts';
 import { createHttpExecutor } from './executors/http.ts';
-import { nodeResolver, nodeTransport } from './net.ts';
-import { JOB_OPTIONS, PARSE_QUEUE, RUN_QUEUE, cancelKey, runChannel, zRunJob } from './protocol.ts';
+import { nodeHostFetch, nodeResolver, nodeTransport } from './net.ts';
+import {
+  JOB_OPTIONS,
+  PARSE_QUEUE,
+  PLAN_QUEUE,
+  RUN_QUEUE,
+  cancelKey,
+  runChannel,
+  zPlanJob,
+  zRunJob,
+} from './protocol.ts';
 import { RunLogWriter, type RunLogStore } from './runlog.ts';
 import { sweep, type ReaperStore } from './reaper.ts';
 import { createEgressProxy } from './sandbox/egress-proxy.ts';
@@ -357,6 +368,76 @@ export async function runJob(deps: RunnerDeps, raw: unknown): Promise<RawRunResu
   return result;
 }
 
+/** Reads a collected artifact back as text — the engine's stdout for the adapter (Part 2 §37). */
+export function s3Read(env: ReturnType<typeof loadServerEnvFromProcess>) {
+  return async (ref: ArtifactRef): Promise<string> => {
+    const url = `${env.S3_ENDPOINT.replace(/\/$/, '')}/${ref.bucket}/${ref.key}`;
+    const response = await fetch(url, { method: 'GET' });
+    if (!response.ok) throw new Error(`artifact read failed with ${String(response.status)}`);
+    return await response.text();
+  };
+}
+
+/**
+ * Executes one query plan on this host (Part 2 §36/§37). This is the trigger the architecture was
+ * missing: `plan.ts` could always run a plan, but nothing asked it to. The engines reach processes
+ * through the same container executor and the same sandbox flags every integration run gets — one
+ * confinement, not a second door (N5) — and progress is published on the run channel so a UI can
+ * follow it exactly like a run.
+ */
+export async function runPlanQueueJob(
+  deps: RunnerDeps & { readonly readArtifact: (ref: ArtifactRef) => Promise<string> },
+  raw: unknown,
+): Promise<void> {
+  const job = zPlanJob.parse(raw);
+  const watch = await watchCancel(redisCancelBackend(deps.redis, deps.subscriber), job.runId);
+  const executor = createContainerExecutor({
+    sink: deps.sink,
+    bucket: deps.bucket,
+    orgId: job.orgId,
+    watch,
+    now: () => new Date().toISOString(),
+    runtime: dockerRuntime(),
+    ...(deps.allowedRegistries === undefined ? {} : { allowedRegistries: deps.allowedRegistries }),
+    sandbox: {
+      runtime: process.env.NODE_ENV === 'production' ? 'runsc' : 'runc',
+      proxyUrl: deps.proxyUrl,
+      network: EGRESS_NETWORK,
+      seccompProfile: DEFAULT_SECCOMP_PROFILE,
+      apparmorProfile: DEFAULT_APPARMOR_PROFILE,
+      env: {},
+      secretEnv: {},
+    },
+  });
+
+  try {
+    const result = await runPlanJob(job, {
+      adapters: createHostAdapters({
+        manifestFor: (id) => builtinRegistry().entries.get(id)?.manifest,
+        executor,
+        readArtifact: deps.readArtifact,
+        runId: () => job.runId,
+        cancelToken: cancelKey,
+      }),
+      fetch: nodeHostFetch,
+      onEvent: (event) => {
+        void deps.redis.publish(runChannel(job.runId), JSON.stringify(event));
+      },
+    });
+    log.info(
+      {
+        event: 'plan.finished',
+        run_id: job.runId,
+        entities: result.entities.length,
+        warnings: result.summary.warnings.length,
+      },
+      'plan finished',
+    );
+  } finally {
+    await watch.stop();
+  }
+}
+
 export async function start(): Promise<() => Promise<void>> {
   const env = loadServerEnvFromProcess();
   const connection = new IORedis(env.REDIS_URL, { maxRetriesPerRequest: null });
@@ -373,6 +454,15 @@ export async function start(): Promise<() => Promise<void>> {
     bucket: env.S3_BUCKET,
     proxyUrl: `http://egress:${String(proxyPort)}`,
   };
+
+  const planWorker = new Worker(
+    PLAN_QUEUE,
+    async (job: Job) => {
+      log.info({ event: 'plan.claimed', job_id: job.id }, 'claimed a plan');
+      await runPlanQueueJob({ ...deps, readArtifact: s3Read(env) }, job.data);
+    },
+    { connection, concurrency: 1 },
+  );
 
   const worker = new Worker(
     RUN_QUEUE,
@@ -397,12 +487,13 @@ export async function start(): Promise<() => Promise<void>> {
 
   log.info(
     { event: 'runner.started', proxy_port: proxyPort },
-    'runner is consuming integration.run',
+    'runner is consuming integration.run and query.plan',
   );
 
   return async () => {
     clearInterval(reaper);
     await worker.close();
+    await planWorker.close();
     await parseQueue.close();
     await proxy.close();
     connection.disconnect();

@@ -7,7 +7,15 @@
  */
 
 import { lookup } from 'node:dns/promises';
-import type { Resolver, Transport, TransportResponse } from '@nexus/domain';
+import {
+  ALLOWED_CONTENT_TYPES,
+  safeFetch,
+  type Resolver,
+  type SafeFetchResult,
+  type Transport,
+  type TransportResponse,
+} from '@nexus/domain';
+import type { HostFetch } from '@nexus/transforms';
 
 export const nodeResolver: Resolver = async (hostname) => {
   const answers = await lookup(hostname, { all: true, verbatim: true });
@@ -37,4 +45,38 @@ export const nodeTransport: Transport = async (request): Promise<TransportRespon
       }
     },
   };
+};
+
+/**
+ * `HostFetch` for engines executed on this host (Part 2 §37). The contract is small on purpose:
+ * a status and a body, never a throw — an engine that gets an exception instead of a status turns
+ * a dead endpoint into a failed run (U5). It goes through `safeFetch`, so an engine cannot reach
+ * the metadata service or a private address any more than an integration can.
+ */
+export const nodeHostFetch: HostFetch = async (url, init) => {
+  try {
+    const response = await safeFetch(url, {
+      resolve: nodeResolver,
+      transport: nodeTransport,
+      method: init?.method === 'POST' ? 'POST' : 'GET',
+      // Engines talk to JSON APIs; the unfurl allowlist is HTML-only, so widen it by exactly one.
+      contentTypes: [...ALLOWED_CONTENT_TYPES, 'application/json'],
+      ...(init?.headers === undefined ? {} : { headers: init.headers }),
+    });
+    return { status: response.status, body: parseBody(response) };
+  } catch {
+    // The URL was refused, the host did not resolve, or the transport failed: one status, because
+    // the engine can do nothing different with the distinction.
+    return { status: 502, body: null };
+  }
+};
+
+const parseBody = (response: SafeFetchResult): unknown => {
+  if (!response.contentType.includes('json')) return response.body;
+  try {
+    return JSON.parse(response.body);
+  } catch {
+    // Declared JSON that is not JSON is the server's error, not the engine's: hand back the text.
+    return response.body;
+  }
 };
