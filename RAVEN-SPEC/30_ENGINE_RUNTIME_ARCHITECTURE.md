@@ -115,7 +115,9 @@ image is the host's business, not the core's. The adapter therefore imports no p
 the host injects `spawn`. That is what keeps `@nexus/transforms` importable from the browser bundle
 (N2) and keeps the single sanctioned process door inside the runner's container executor (N5).
 
-stdout is parsed as JSON lines, one JSON document, or plain lines — the three shapes that cover
+The host half renders the command from the integration manifest and runs it through the runner's
+`ExecutionLayer` — the caller's `timeoutMs` is a _ceiling_ on the manifest's wall clock, never an
+extension of it. stdout is parsed as JSON lines, one JSON document, or plain lines — the three shapes that cover
 subfinder/httpx/dnsx, API-style tools and Sherlock. Failures are typed rather than swallowed:
 `timeout`, `unavailable`, `invalid-input` (the payload could not be rendered as argv), `upstream`
 (non-zero exit; retryable only when the process was killed) and `internal`. Progress is reported as
@@ -124,10 +126,12 @@ run console (§24).
 
 ## 7. Gaps
 
-1. The `cli` / `python` adapters exist and are tested, but nothing binds them to the host yet: the
-   `spawn` implementation on top of the runner's container executor (the only sanctioned process
-   door) is the next step. Until it lands, amass/sherlock/subfinder are classified, limited and
-   dispatchable in principle, not executed.
+1. The `cli` / `python` adapters and their host binding exist
+   (`apps/runner/src/executors/engineAdapters.ts`, routed through the existing `ExecutionLayer`, so
+   an engine run is confined exactly like every other run). What is still missing is upstream of
+   them: the query executor does not yet dispatch a plan step through `AdapterRegistry`, and the
+   containerized engines have no pinned image digest, so amass/subfinder remain disabled-not-latest
+   (`13_SHERLOCK.md` §1.2 rule) until an operator pins one.
 2. No external worker implementation ships with the repo; the queue is exercised by tests only.
 3. Footprints for derived passports are conservative defaults, not measurements. Real numbers come
    from running the engines under the resource manager (`29` §6) and recording what they use.

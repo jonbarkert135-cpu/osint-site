@@ -11,14 +11,8 @@ const input: AdapterInput = {
   timeoutMs: 5_000,
 };
 
-const adapter = (
-  exit: Partial<CliExit>,
-  argv: readonly string[] | null = ['subfinder', '-d', 'example.com'],
-) =>
-  createCliAdapter({
-    spawn: vi.fn(async () => ({ code: 0, stdout: '', ...exit })),
-    commandFor: () => argv,
-  });
+const adapter = (exit: Partial<CliExit>) =>
+  createCliAdapter({ run: vi.fn(async () => ({ code: 0, stdout: '', ...exit })) });
 
 describe('parseCliStdout', () => {
   it('reads JSON lines', () => {
@@ -54,8 +48,8 @@ describe('cli adapter (§37, §38)', () => {
     });
   });
 
-  it('refuses a payload it cannot render instead of running a broken command', async () => {
-    const result = await adapter({}, null).execute(input);
+  it('refuses a payload the host could not render instead of reporting a tool failure', async () => {
+    const result = await adapter({ failure: 'invalid-input' }).execute(input);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.kind).toBe('invalid-input');
   });
@@ -89,10 +83,7 @@ describe('cli adapter (§37, §38)', () => {
   });
 
   it('never lets a thrown spawn escape', async () => {
-    const thrower = createCliAdapter({
-      spawn: () => Promise.reject(new Error('no docker')),
-      commandFor: () => ['x'],
-    });
+    const thrower = createCliAdapter({ run: () => Promise.reject(new Error('no docker')) });
     const result = await thrower.execute(input);
     expect(result).toEqual({
       ok: false,
@@ -101,11 +92,8 @@ describe('cli adapter (§37, §38)', () => {
   });
 
   it('python is the same adapter with its own passport', () => {
-    expect(
-      createPythonAdapter({
-        spawn: async () => ({ code: 0, stdout: '' }),
-        commandFor: () => ['sherlock'],
-      }).runtime,
-    ).toBe('python');
+    expect(createPythonAdapter({ run: async () => ({ code: 0, stdout: '' }) }).runtime).toBe(
+      'python',
+    );
   });
 });

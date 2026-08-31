@@ -203,8 +203,10 @@ resource budget keeps its conservative defaults until that output is recorded.
 | 38  | Multi-runtime support | `ENGINE_RUNTIMES` + `ADAPTER_SUPPORT`                            | ⚠️ 5 of 8 implemented    |
 | 39  | Engine manifest       | `EngineRuntimeSchema`, `resolveRuntime()`                        | ✅ validated, derivable  |
 
-Design and gaps: `30_ENGINE_RUNTIME_ARCHITECTURE.md`. Two honest limits: the cli/python adapters
-now exist (`packages/transforms/src/cliAdapter.ts`, 2026-08-31) but no host `spawn` is bound to them
-yet, so the three containerized engines (amass, sherlock, subfinder) are classified, limited and
-dispatchable-in-principle rather than runnable; and no external worker ships with the repo, so §36
-is exercised by tests rather than in production.
+Design and gaps: `30_ENGINE_RUNTIME_ARCHITECTURE.md`. The cli/python adapters
+(`packages/transforms/src/cliAdapter.ts`) and their host binding
+(`apps/runner/src/executors/engineAdapters.ts`) shipped on 2026-08-31: an engine run now goes
+through the same sandbox, egress proxy, limits and artifact collection as every other run. Two
+honest limits remain: the query executor still does not dispatch plan steps through the
+`AdapterRegistry`, and no external worker ships with the repo, so §36 is exercised by tests rather
+than in production.

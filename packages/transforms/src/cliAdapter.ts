@@ -3,7 +3,7 @@
  *
  * Both runtimes are the same act from the core's point of view: render a command, run it somewhere,
  * read stdout. The difference (a Go binary vs a Python image) is the host's business, so this file
- * owns no process API at all: the caller injects `spawn`. That keeps `@nexus/transforms` importable
+ * owns no process API at all: the caller injects `run`. That keeps `@nexus/transforms` importable
  * from the browser bundle (N2) and keeps the single sanctioned process door in the runner (N5).
  */
 
@@ -15,24 +15,20 @@ export interface CliExit {
   readonly code: number | null;
   readonly stdout: string;
   readonly stderr?: string;
-  /** Set when the host itself refused: no docker, no binary, timeout. */
-  readonly failure?: 'timeout' | 'unavailable';
+  /** Set when the host itself refused: no docker, no binary, a bad payload, a timeout. */
+  readonly failure?: 'timeout' | 'unavailable' | 'invalid-input';
 }
 
-/** Injected by the host. Must enforce `timeoutMs` itself — the adapter cannot kill a process. */
-export type CliSpawn = (
-  argv: readonly string[],
-  options: { readonly timeoutMs: number },
-) => Promise<CliExit>;
+/**
+ * Injected by the host: renders the command for this engine, runs it under whatever confinement the
+ * host has, and returns what came back. It must enforce `input.timeoutMs` itself — the adapter holds
+ * no process handle and cannot kill anything.
+ */
+export type CliRun = (input: AdapterInput) => Promise<CliExit>;
 
 export interface CliAdapterOptions {
   readonly runtime?: EngineRuntime;
-  readonly spawn: CliSpawn;
-  /**
-   * Renders the argv for one invocation. Returns null when this engine cannot express the payload,
-   * which is an `invalid-input` refusal rather than a run that fails halfway.
-   */
-  readonly commandFor: (input: AdapterInput) => readonly string[] | null;
+  readonly run: CliRun;
   readonly available?: () => boolean | Promise<boolean>;
 }
 
@@ -74,24 +70,12 @@ export const createCliAdapter = (options: CliAdapterOptions): EngineAdapter => (
   available: options.available ?? (() => true),
 
   async execute(input: AdapterInput, onProgress): Promise<AdapterResult> {
-    const argv = options.commandFor(input);
-    if (argv === null || argv.length === 0) {
-      return {
-        ok: false,
-        error: {
-          kind: 'invalid-input',
-          message: `${input.engineId} cannot run capability ${input.capability} on this payload`,
-          retryable: false,
-        },
-      };
-    }
-
     // A CLI reports no percentage, and inventing one would be a lie the run console repeats (§24).
     onProgress?.({ fraction: null, message: `running ${input.engineId}` });
 
     let exit: CliExit;
     try {
-      exit = await options.spawn(argv, { timeoutMs: input.timeoutMs });
+      exit = await options.run(input);
     } catch (error) {
       return {
         ok: false,
@@ -110,6 +94,18 @@ export const createCliAdapter = (options: CliAdapterOptions): EngineAdapter => (
           kind: 'timeout',
           message: `${input.engineId} exceeded ${input.timeoutMs}ms`,
           retryable: true,
+        },
+      };
+    }
+    if (exit.failure === 'invalid-input') {
+      return {
+        ok: false,
+        error: {
+          kind: 'invalid-input',
+          message:
+            exit.stderr?.trim() ||
+            `${input.engineId} cannot run capability ${input.capability} on this payload`,
+          retryable: false,
         },
       };
     }
