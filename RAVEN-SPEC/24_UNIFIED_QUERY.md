@@ -399,3 +399,25 @@ data: Deep Scan is the preset that admits minute-scale runs, and its budget stat
    large runs; the interface is written so either can be true.
 3. How deep a "deep run" may go before it becomes a scheduled background job rather than an
    interactive query — current guess is `maxDepth > 2` or estimated wall time > 60 s.
+
+## Automatic service recommendation (Part 2 §41)
+
+A query does not fire every engine in the catalogue. `recommendServices()`
+(`packages/query-engine/src/recommend.ts`) types the input, routes it once, and returns three tiers
+the analyst can act on without reading a catalogue:
+
+- **Required** — the core coverage for this entity kind (`priority: core`, and something usable can
+  run it). For `example_user`: profile discovery → Sherlock.
+- **Recommended** — broadens coverage (`priority: recommended`), e.g. web mentions.
+- **Optional** — everything else, _plus_ anything the router refused, carrying the reason
+  ("needs credentials", "blocked by the current execution mode") instead of silently vanishing.
+
+The tiering is data-driven: it reads the `priority` each transform manifest already declares and the
+router's verdict, so no second ranking heuristic can drift away from `21_TRANSFORM_SYSTEM.md §6`.
+Deprecated transforms are not offered at all; each capability appears once, represented by its
+best-scoring transform.
+
+Two selections come out of it: `runAll` — every offer that can actually run (never one that cannot,
+so **Run all** never means "fail nine times") — and `defaultSelection`, required + recommended, which
+is where **Customize** starts. The layer proposes; execution still needs the analyst's commit (N4).
+UI for the two buttons is not built yet; this is the model behind them.

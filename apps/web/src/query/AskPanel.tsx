@@ -23,6 +23,7 @@ import type * as Y from 'yjs';
 import { ProposalReview } from '../integrations/ProposalReview.tsx';
 import { toImportProposal } from './investigationProposal.ts';
 import { ResultsDashboard } from './ResultsDashboard.tsx';
+import { downloadRawOutput, hasRawOutput } from './rawOutput.ts';
 import { RunConsole } from './RunConsole.tsx';
 import { useQueryRun } from './useQueryRun.ts';
 
@@ -52,6 +53,7 @@ const REASON_LABELS: Record<string, string> = {
   'budget-exhausted': 'over budget',
   'over-resource-budget': 'too expensive for this scan',
   'cost-not-justified': 'not worth the cost here',
+  'over-capacity': 'host at capacity',
 };
 
 export function AskPanel({ open, onClose, doc, boardId, onUndo, hostFetch }: AskPanelProps) {
@@ -90,6 +92,9 @@ export function AskPanel({ open, onClose, doc, boardId, onUndo, hostFetch }: Ask
   );
 
   const investigation = runner.result;
+  const rawRunIds = (investigation?.runs ?? [])
+    .map((record) => record.id)
+    .filter((id) => hasRawOutput(id));
 
   // The run is a proposal, not a write (U7/N4): it goes through the same review + apply path as an
   // integration import, so it is previewable, per-item selectable and one undo step.
@@ -342,6 +347,7 @@ export function AskPanel({ open, onClose, doc, boardId, onUndo, hostFetch }: Ask
           open={consoleOpen}
           onToggle={() => setConsoleOpen((current) => !current)}
           running={runner.phase === 'running'}
+          {...(rawRunIds.length === 0 ? {} : { onDownloadRaw: () => downloadRawOutput(rawRunIds) })}
         />
       ) : null}
 

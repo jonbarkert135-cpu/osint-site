@@ -2,6 +2,7 @@ export * from './selectors.ts';
 export * from './plan.ts';
 export * from './presets.ts';
 export * from './workflow.ts';
+export * from './recommend.ts';
 export * from './normalize.ts';
 export * from './resolve.ts';
 export * from './dedupe.ts';

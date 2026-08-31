@@ -131,6 +131,10 @@ reading order and the graph-query workflow, so it does not re-read the tree to o
 5. `ci-ok` is the single required check; it aggregates lint, typecheck, unit, coverage-gate,
    build, e2e, visual, bench, audit, docker and migrate-check.
 6. In the same PR, move the phase into the `20_ROADMAP.md` ledger and delete its prompt.
+7. **Merge it into `main` as soon as `ci-ok` is green** — squash-merge and delete the branch
+   (`gh pr merge <n> --squash --delete-branch`). Never leave finished work sitting on a branch and
+   never stack a PR on an unmerged one: `main` is the only source of truth, and stale branches just
+   cost the next agent context to read.
 
 Nothing is implemented "later": if a capability is in the core vision, it has a full architectural
 solution in the spec before code is written. No `TODO` markers survive CI.

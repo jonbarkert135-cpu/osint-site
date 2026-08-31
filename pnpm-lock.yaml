@@ -122,6 +122,9 @@ importers:
       '@nexus/integrations':
         specifier: workspace:*
         version: link:../../packages/integrations
+      '@nexus/transforms':
+        specifier: workspace:*
+        version: link:../../packages/transforms
       bullmq:
         specifier: ^5.34.4
         version: 5.81.3
@@ -6431,6 +6434,7 @@ packages:
         integrity: sha512-6ZiOBfCywsD4k1BN9IX0uZhF+tJkV8q8llP64G5Hajs4JOeVLPCwpPVcpXy3BwYiUGgyJzsJJQeOIv7+hDSq8g==,
       }
     engines: { node: ^16 || ^18 || >=20 }
+    deprecated: prom-client has been replaced by @prometheus-io/client
 
   prompts@2.4.2:
     resolution:
