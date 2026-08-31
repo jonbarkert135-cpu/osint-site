@@ -8,6 +8,7 @@
 
 import { lookup } from 'node:dns/promises';
 import {
+  ALLOWED_CONTENT_TYPES,
   safeFetch,
   type Resolver,
   type SafeFetchResult,
@@ -58,6 +59,8 @@ export const nodeHostFetch: HostFetch = async (url, init) => {
       resolve: nodeResolver,
       transport: nodeTransport,
       method: init?.method === 'POST' ? 'POST' : 'GET',
+      // Engines talk to JSON APIs; the unfurl allowlist is HTML-only, so widen it by exactly one.
+      contentTypes: [...ALLOWED_CONTENT_TYPES, 'application/json'],
       ...(init?.headers === undefined ? {} : { headers: init.headers }),
     });
     return { status: response.status, body: parseBody(response) };
