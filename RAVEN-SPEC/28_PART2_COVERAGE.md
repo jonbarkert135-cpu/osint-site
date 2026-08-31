@@ -555,3 +555,30 @@ Still open, and stated rather than papered over: no deployment runs the external
 machine (the transport exists; the second machine does not), containerized engines still have no
 pinned image digest, and nothing enqueues `query.plan` from the web app yet — the queue is the
 contract, the caller is the next batch.
+
+---
+
+## Batch: something in the product finally asks the host to plan (§37)
+
+The previous batch left the plan queue with no caller. It has one now, and it is deliberately thin.
+
+**`queries.plan`.** `apps/api/src/trpc/routers/queries.ts` validates the query, the mode, the stated
+permissions and the depth against the same shape `zPlanJob` accepts, mints a run id, enqueues
+`query.plan` through `enqueuePlan()` (`apps/api/src/integrations/queue.ts`, second BullMQ queue on
+the connection the run queue already opened) and audits `query.plan.requested`. It does not plan and
+does not execute (N5): the plan is still derived by the runner at claim time, so a message that sat
+in Redis over a deploy cannot carry a stale plan. Permissions are forwarded exactly as stated and
+never widened (N4) — what the caller does not name, the runner does not get. The audit entry records
+the mode, the number of permissions and the query's length, not the query: the string is user input
+about a third party.
+
+**"Run on the host".** `apps/web/src/query/HostRunButton.tsx` is one button next to "Run plan" in the
+Ask panel, mounted only when the build has a backend (`localOnly` from the mode registry), so a
+local-first tab is unchanged and never shows an action it cannot perform. It sends the raw query —
+not a plan — and reports the run id the runner publishes progress under. "Queued" is all it claims,
+because that is all that happened; a refusal prints the API's own sentence instead of a spinner that
+never ends (U5).
+
+Still open: no deployment runs the external worker on a second machine, and containerized engines
+still have no pinned image digest, so a host plan today runs the same native engines the tab does —
+the difference is where, not yet what.

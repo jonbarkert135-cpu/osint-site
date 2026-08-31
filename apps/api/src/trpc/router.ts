@@ -12,6 +12,7 @@ import { consentsRouter } from './routers/consents.ts';
 import { apiTokensRouter } from './routers/apiTokens.ts';
 import { repositoriesRouter } from './routers/repositories.ts';
 import { watchesRouter } from './routers/watches.ts';
+import { queriesRouter } from './routers/queries.ts';
 
 export const appRouter = router({
   auth: authRouter,
@@ -28,6 +29,7 @@ export const appRouter = router({
   apiTokens: apiTokensRouter,
   repositories: repositoriesRouter,
   watches: watchesRouter,
+  queries: queriesRouter,
 });
 
 /** Consumed by `apps/web` as a type-only import — the client never imports the runtime router. */

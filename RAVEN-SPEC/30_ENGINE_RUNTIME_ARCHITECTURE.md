@@ -165,9 +165,10 @@ run console (§24).
    adapters, builds the engine library with `registryEngines()` and runs a plan through
    `executePlan`. The browser keeps its builtin-only library by design (N2). What is still missing
    is a caller: the runner now consumes `query.plan` (`zPlanJob`, `runPlanJob`/`runPlanQueueJob`),
-   so a queue message asks this host for a plan and the events land on the run channel — but nothing
-   in the web app enqueues one yet. The containerized engines also still have no pinned image digest
-   (`13_SHERLOCK.md` §1.2).
+   so a queue message asks this host for a plan and the events land on the run channel, and the web
+   app now has the caller: `queries.plan` (`apps/api/src/trpc/routers/queries.ts`) enqueues one and
+   the Ask panel's "Run on the host" button calls it in any build with a backend. The containerized
+   engines still have no pinned image digest (`13_SHERLOCK.md` §1.2).
 3. The external worker loop ships (`packages/transforms/src/remoteWorker.ts`) and now has a
    transport — `httpQueue.ts`: `createHttpWorkerTransport()` for the worker, `handleQueueRequest()`
    as the Result API the core mounts. What is still missing is a deployment: nothing in the repo
