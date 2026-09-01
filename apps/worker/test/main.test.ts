@@ -9,10 +9,18 @@ import type { ArtifactRef } from '@nexus/integrations';
 
 const prismaMock = {
   integrationRun: { findUnique: vi.fn(), update: vi.fn() },
-  boardProjectionNode: { findMany: vi.fn() },
+  boardProjectionNode: { findMany: vi.fn(), findUnique: vi.fn() },
   importProposal: { create: vi.fn() },
   runLogEntry: { findFirst: vi.fn(), createMany: vi.fn() },
+  aiChunk: { findMany: vi.fn(), deleteMany: vi.fn() },
+  $executeRaw: vi.fn(() => Promise.resolve(1)),
 };
+
+// `Prisma.sql` as a plain tag so the vector-vs-NULL fragments are visible in assertions.
+const sqlTag = (strings: TemplateStringsArray, ...values: unknown[]) => ({
+  sql: strings.join('?'),
+  values,
+});
 
 const workerCtor = vi.fn();
 const workerClose = vi.fn(() => Promise.resolve());
@@ -22,7 +30,7 @@ const redisInstances: {
   publish: ReturnType<typeof vi.fn>;
 }[] = [];
 
-vi.mock('@nexus/db', () => ({ prisma: prismaMock }));
+vi.mock('@nexus/db', () => ({ prisma: prismaMock, Prisma: { sql: sqlTag } }));
 
 const queueAdd = vi.fn(() => Promise.resolve());
 const queueClose = vi.fn(() => Promise.resolve());
@@ -74,6 +82,8 @@ vi.mock('../src/queues/integration.parse.ts', async (importOriginal) => ({
 
 const {
   PARSE_QUEUE,
+  embedderFromEnv,
+  prismaEmbedStore,
   prismaGithubJobStore,
   prismaParseStore,
   s3ArtifactReader,
@@ -480,5 +490,107 @@ describe('prismaGithubJobStore', () => {
       where: { id: 'run-1' },
       data: { status: 'failed', errorCode: 'GH_RATE_LIMITED', errorDetail: payload },
     });
+  });
+});
+
+describe('embedderFromEnv', () => {
+  type Env = Parameters<typeof embedderFromEnv>[0];
+
+  it('builds the OpenAI-compatible embedder when an endpoint is configured', () => {
+    const embedder = embedderFromEnv({
+      AI_PROVIDER: 'openai-compatible',
+      AI_BASE_URL: 'http://ai.test/v1',
+      AI_API_KEY: 'k',
+      AI_EMBED_MODEL: 'text-embedding-3-small',
+    } as Env);
+    expect(embedder.modelId).toBe('text-embedding-3-small');
+  });
+
+  it('is honestly unavailable without one (U5)', async () => {
+    const embedder = embedderFromEnv({ AI_EMBED_MODEL: 'm' } as Env);
+    expect(embedder.modelId).toBe('none');
+    await expect(embedder.embed(['x'])).rejects.toThrow('No embedding endpoint');
+  });
+});
+
+describe('prismaEmbedStore', () => {
+  beforeEach(() => {
+    prismaMock.boardProjectionNode.findUnique.mockReset();
+    prismaMock.aiChunk.findMany.mockReset();
+    prismaMock.aiChunk.deleteMany.mockReset();
+    prismaMock.$executeRaw.mockClear();
+  });
+
+  it('loadNode returns null for a missing node', async () => {
+    prismaMock.boardProjectionNode.findUnique.mockResolvedValueOnce(null);
+    expect(await prismaEmbedStore.loadNode('nope')).toBeNull();
+  });
+
+  it('loadNode maps the projection row and its project', async () => {
+    prismaMock.boardProjectionNode.findUnique.mockResolvedValueOnce({
+      id: 'n1',
+      boardId: 'b1',
+      type: 'person',
+      title: 'Ada',
+      data: null,
+      deletedAt: null,
+      board: { projectId: 'p1' },
+    });
+    expect(await prismaEmbedStore.loadNode('n1')).toEqual({
+      id: 'n1',
+      projectId: 'p1',
+      boardId: 'b1',
+      type: 'person',
+      title: 'Ada',
+      data: {},
+      deletedAt: null,
+    });
+  });
+
+  it('existing keys rows by kind:ord', async () => {
+    prismaMock.aiChunk.findMany.mockResolvedValueOnce([
+      { id: 'c1', kind: 'title', ord: 0, contentHash: 'h1' },
+      { id: 'c2', kind: 'body', ord: 1, contentHash: 'h2' },
+    ]);
+    const map = await prismaEmbedStore.existing('n1', 'm');
+    expect(map.get('title:0')).toEqual({ id: 'c1', hash: 'h1' });
+    expect(map.get('body:1')).toEqual({ id: 'c2', hash: 'h2' });
+  });
+
+  const row = {
+    projectId: 'p1',
+    boardId: 'b1',
+    nodeId: 'n1',
+    kind: 'body' as const,
+    ord: 0,
+    text: 'hello',
+    tokenCount: 1,
+    contentHash: 'h',
+    model: 'm',
+  };
+
+  it('upsertChunk sends the vector as a ::vector text literal', async () => {
+    await prismaEmbedStore.upsertChunk({ ...row, embedding: [0.5, 1.5] });
+    const values = prismaMock.$executeRaw.mock.calls[0]?.slice(1) as unknown[];
+    const fragment = values.at(-1) as { sql: string; values: unknown[] };
+    expect(fragment.sql).toContain('::vector(1536)');
+    expect(fragment.values).toEqual(['[0.5,1.5]']);
+    expect(values).toContain('hello');
+  });
+
+  it('upsertChunk writes an honest NULL embedding when the endpoint was down', async () => {
+    await prismaEmbedStore.upsertChunk({ ...row, embedding: null });
+    const values = prismaMock.$executeRaw.mock.calls[0]?.slice(1) as unknown[];
+    const fragment = values.at(-1) as { sql: string };
+    expect(fragment.sql).toBe('NULL');
+  });
+
+  it('deleteChunks and deleteAllChunks scope their deletes', async () => {
+    await prismaEmbedStore.deleteChunks(['c1', 'c2']);
+    expect(prismaMock.aiChunk.deleteMany).toHaveBeenCalledWith({
+      where: { id: { in: ['c1', 'c2'] } },
+    });
+    await prismaEmbedStore.deleteAllChunks('n1');
+    expect(prismaMock.aiChunk.deleteMany).toHaveBeenCalledWith({ where: { nodeId: 'n1' } });
   });
 });

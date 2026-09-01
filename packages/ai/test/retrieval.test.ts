@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  AI_EMBED_QUEUE,
   AIUnavailableError,
   applyBoosts,
   chunkText,
   contentHash,
   createRetriever,
   dedupeByNode,
+  EMBED_DEBOUNCE_MS,
+  embedJobOptions,
   estimateTokens,
   openAICompatibleEmbedder,
   rrf,
@@ -228,5 +231,23 @@ describe('createRetriever', () => {
     const retrieve = createRetriever({ embedder: workingEmbedder, search: search(many, []) });
     const result = await retrieve('q', { projectId: 'p' }, 5);
     expect(result.chunks).toHaveLength(5);
+  });
+});
+
+describe('embedJobOptions', () => {
+  it('buckets the jobId by the debounce window so later edits re-embed', () => {
+    const idAt = (ms: number) => embedJobOptions('n1', () => ms).jobId;
+    expect(idAt(0)).toBe('embed:n1:0');
+    expect(idAt(EMBED_DEBOUNCE_MS - 1)).toBe('embed:n1:0');
+    expect(idAt(EMBED_DEBOUNCE_MS)).toBe('embed:n1:1');
+  });
+
+  it('delays by the debounce window and cleans up after itself', () => {
+    const options = embedJobOptions('n1');
+    expect(options.jobId.startsWith('embed:n1:')).toBe(true);
+    expect(options.delay).toBe(EMBED_DEBOUNCE_MS);
+    expect(options.attempts).toBe(1);
+    expect(options.removeOnComplete).toBe(true);
+    expect(AI_EMBED_QUEUE).toBe('ai.embed');
   });
 });
