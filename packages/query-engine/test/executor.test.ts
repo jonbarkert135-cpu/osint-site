@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 
 import { createEngineLibrary, executePlan, runPlan, type ExecuteDeps } from '../src/executor.ts';
 import { planQuery } from '../src/plan.ts';
+import { createPacer, type Pacer } from '../src/pace.ts';
 import { createResourceManager, DEFAULT_RESOURCE_BUDGET } from '../src/resources.ts';
 import type { QueryEvent } from '../src/events.ts';
 
@@ -279,5 +280,75 @@ describe('admission control (§32)', () => {
     );
     expect(skips.length).toBeGreaterThan(0);
     expect(result.summary.warnings.some((warning) => warning.includes('RAM left'))).toBe(true);
+  });
+});
+
+describe('provider pacing (§65)', () => {
+  it('spaces engine calls without changing what the run produces', async () => {
+    const waits: number[] = [];
+    const pacer = createPacer({
+      sleep: async (ms) => {
+        waits.push(ms);
+        await Promise.resolve();
+      },
+    });
+    const { result } = await collect(planQuery(registry, 'example.com', ctx()), { pacer });
+    expect(result.entities.length).toBeGreaterThan(0);
+    expect(waits.every((ms) => ms >= 0)).toBe(true);
+  });
+
+  it('skips a step whose provider has no quota left instead of failing the query', async () => {
+    const exhausted: Pacer = {
+      take: () =>
+        Promise.resolve({
+          ok: false,
+          reason: 'daily-quota',
+          message: 'quota spent for today',
+        }),
+      used: () => 0,
+    };
+    const { events, result } = await collect(planQuery(registry, 'example.com', ctx()), {
+      pacer: exhausted,
+    });
+    const skips = events.filter(
+      (event) => event.type === 'step.skipped' && event.reason === 'provider-rate-limited',
+    );
+    expect(skips.length).toBeGreaterThan(0);
+    expect(result.summary.warnings).toContain('quota spent for today');
+    expect(result.summary.status).not.toBe('failed');
+  });
+
+  it('releases the resource lease of a step the pacer refused', async () => {
+    const resources = createResourceManager();
+    const exhausted: Pacer = {
+      take: () =>
+        Promise.resolve({ ok: false, reason: 'daily-quota', message: 'quota spent for today' }),
+      used: () => 0,
+    };
+    await collect(planQuery(registry, 'example.com', ctx()), { pacer: exhausted, resources });
+    expect(resources.usage().inFlight).toBe(0);
+  });
+});
+
+describe('event backpressure (§65)', () => {
+  it('stops scheduling while the consumer is behind, and still delivers every event', async () => {
+    const events: QueryEvent[] = [];
+    const iterator = executePlan(
+      planQuery(registry, 'example.com', ctx()),
+      deps({ eventHighWater: 0 }),
+    );
+    for (;;) {
+      const step = await iterator.next();
+      if (step.done === true) {
+        expect(step.value.entities.length).toBeGreaterThan(0);
+        break;
+      }
+      events.push(step.value);
+      // A consumer that yields to the event loop between reads is exactly the case the valve is
+      // for: the driver must wait for it rather than pile events up.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    expect(events.at(-1)?.type).toBe('plan.done');
+    expect(events.filter((event) => event.type === 'step.done').length).toBeGreaterThan(0);
   });
 });

@@ -35,6 +35,7 @@ import {
 } from '@nexus/transforms';
 
 import type { ResourceManager } from './resources.ts';
+import type { Pacer } from './pace.ts';
 
 import type {
   InvestigationResult,
@@ -86,6 +87,17 @@ export interface ExecuteDeps {
    * step, never a crash (U5).
    */
   readonly resources?: ResourceManager;
+  /**
+   * Provider pacing (§65). Injected for the same reason as `resources`: the interval belongs to
+   * the host process, which may be running other queries against the same provider. A refused
+   * provider is a skipped step, never a crash (U5).
+   */
+  readonly pacer?: Pacer;
+  /**
+   * Events buffered ahead of the consumer before the driver stops scheduling steps (§65). Exposed
+   * mainly so a slow consumer can be tested; the default suits a UI reading over a websocket.
+   */
+  readonly eventHighWater?: number;
 }
 
 const DEFAULT_BUDGET: Budget = {
@@ -95,6 +107,9 @@ const DEFAULT_BUDGET: Budget = {
   maxParallel: 4,
   maxTransforms: 12,
 };
+
+/** Events buffered ahead of the consumer before the driver stops scheduling new steps (§65). */
+const EVENT_HIGH_WATER = 256;
 
 /** An engine that overruns its own estimate this far is stuck, not slow. */
 const DEADLINE_SLACK = 3;
@@ -109,12 +124,29 @@ interface StepInput {
   readonly entityId: string;
 }
 
-/** A queue one producer writes and one consumer drains — the seam between concurrency and a generator. */
+/**
+ * A queue one producer writes and one consumer drains — the seam between concurrency and a
+ * generator. `waitForDrain` is the backpressure valve (§65): a consumer that reads slower than a
+ * wide plan emits would otherwise grow this buffer without bound, so the driver stops scheduling
+ * new steps until the reader has caught up.
+ */
 const createChannel = <T>() => {
   const buffer: T[] = [];
   let notify: (() => void) | undefined;
+  let drained: (() => void) | undefined;
   let closed = false;
   return {
+    size: (): number => buffer.length,
+    waitForDrain: async (highWater: number): Promise<void> => {
+      while (!closed && buffer.length > highWater) {
+        await new Promise<void>((resolve) => {
+          drained = () => {
+            drained = undefined;
+            resolve();
+          };
+        });
+      }
+    },
     push: (item: T): void => {
       buffer.push(item);
       notify?.();
@@ -122,10 +154,16 @@ const createChannel = <T>() => {
     close: (): void => {
       closed = true;
       notify?.();
+      drained?.();
     },
     async *drain(): AsyncGenerator<T> {
       for (;;) {
-        while (buffer.length > 0) yield buffer.shift() as T;
+        while (buffer.length > 0) {
+          const item = buffer.shift() as T;
+          if (buffer.length === 0) drained?.();
+          yield item;
+        }
+        drained?.();
         if (closed) return;
         await new Promise<void>((resolve) => {
           notify = () => {
@@ -401,6 +439,15 @@ export async function* executePlan(
         return;
       }
 
+      const pace = deps.pacer === undefined ? undefined : await deps.pacer.take(provider);
+      if (pace?.ok === false) {
+        if (grant?.ok === true) grant.lease.release();
+        skipped += 1;
+        warnings.push(pace.message);
+        emit({ type: 'step.skipped', step: ref, reason: 'provider-rate-limited' });
+        return;
+      }
+
       const outcome = await runEngine(engine, {
         input: { kind: input.kind, value: runInput.value, entityId: input.entityId },
         mode: deps.mode,
@@ -615,7 +662,13 @@ export async function* executePlan(
   const drive = async (): Promise<void> => {
     const inFlight = new Set<Promise<void>>();
     const ceiling = Math.max(1, budget.maxParallel);
+    const highWater = deps.eventHighWater ?? EVENT_HIGH_WATER;
     for (;;) {
+      // Backpressure (§65): a consumer reading slower than the plan emits must slow the plan down,
+      // not be buried under an unbounded buffer of events it has not looked at yet. This waits
+      // before scheduling, never between checking `inFlight` and racing it — an empty race never
+      // settles.
+      if (channel.size() > highWater) await channel.waitForDrain(highWater);
       if (cancelled || deps.signal?.aborted === true) {
         cancelled = true;
         break;
@@ -640,6 +693,8 @@ export async function* executePlan(
         if (scheduler.finished() || scheduler.pending() === 0) break;
         continue;
       }
+      // Backpressure (§65): a consumer that reads slower than the plan emits must slow the plan
+      // down, not be buried under an unbounded buffer of events it has not looked at yet.
       await Promise.race(inFlight);
     }
     await Promise.allSettled([...inFlight]);

@@ -15,8 +15,10 @@ import { AdapterRegistry, createCatalogRegistry, type TransformRegistry } from '
 import { BUILTIN_ENGINES, registryEngines } from '@nexus/transforms/sdk';
 import {
   createEngineLibrary,
+  createPacer,
   executePlan,
   planQuery,
+  prioritise,
   type EngineLibrary,
   type ExecuteDeps,
   type InvestigationResult,
@@ -98,7 +100,7 @@ export const runPlanJob = async (
 ): Promise<InvestigationResult> => {
   const job = zPlanJob.parse(raw);
   const registry = deps.registry ?? createCatalogRegistry();
-  const plan = planQuery(
+  const planned = planQuery(
     registry,
     job.query,
     {
@@ -109,7 +111,13 @@ export const runPlanJob = async (
     job.depth === undefined ? {} : { depth: job.depth },
   );
 
+  // §65: the catalogue is a menu, not a to-do list. Steps are priced and the ones that will not
+  // change the answer inside this run's ceiling are dropped with a reason, and every provider gets
+  // its own interval so one run does not spend an hour's quota in two seconds.
+  const plan = prioritise(registry, planned);
+
   return runHostPlan(plan, {
+    pacer: createPacer(),
     ...deps,
     registry,
     mode: job.mode,
