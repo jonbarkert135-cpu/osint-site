@@ -46,7 +46,8 @@ export type AuditAction =
   | 'apiToken.revoked'
   | 'credential.created'
   | 'credential.rotated'
-  | 'credential.deleted';
+  | 'credential.deleted'
+  | 'ai.settings.updated';
 
 export interface AuditInput extends Omit<AuditEntry, 'action' | 'orgId'> {
   action: AuditAction;

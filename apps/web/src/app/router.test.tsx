@@ -31,7 +31,7 @@ const { fakeWorkspaceRepository } = await import('../data/workspace/testFakes');
 const repository = fakeWorkspaceRepository();
 
 const app = () => (
-  <AppProviders repository={repository} backendEnabled={false}>
+  <AppProviders repository={repository} backendEnabled>
     <AppRoutes />
   </AppProviders>
 );

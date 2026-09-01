@@ -14,7 +14,6 @@ vi.mock('../src/ai/chunkStore.ts', () => ({ createChunkStore: () => ({ vector, l
 
 const { appRouter } = await import('../src/trpc/router.ts');
 const { createCallerFactory } = await import('../src/trpc/trpc.ts');
-const { resetAiSearchForTests } = await import('../src/trpc/routers/aiSearch.ts');
 
 const caller = createCallerFactory(appRouter);
 
@@ -27,8 +26,9 @@ const chunk = (id: string, nodeId: string, score: number) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  resetAiSearchForTests();
   prismaMock.project.findFirst.mockResolvedValue({ id: PROJECT_ID });
+  prismaMock.workspaceSetting.findUnique.mockResolvedValue(null);
+  prismaMock.integrationCredential.findMany.mockResolvedValue([]);
   loadServerEnvFromProcess.mockReturnValue({ AI_PROVIDER: 'mock' });
 });
 

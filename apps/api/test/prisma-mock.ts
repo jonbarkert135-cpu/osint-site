@@ -45,6 +45,7 @@ export const prismaMock = {
     update: vi.fn(),
     deleteMany: vi.fn(),
   },
+  workspaceSetting: { findUnique: vi.fn(), upsert: vi.fn() },
   repository: { findUnique: vi.fn(), findFirst: vi.fn() },
   githubAnalysis: { findFirst: vi.fn() },
   runLogEntry: { findMany: vi.fn(), findFirst: vi.fn(), createMany: vi.fn() },
