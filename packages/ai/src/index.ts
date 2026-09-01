@@ -2,3 +2,7 @@ export * from './provider.ts';
 export * from './proposal.ts';
 export * from './run.ts';
 export * from './types.ts';
+export * from './retrieval/chunk.ts';
+export * from './retrieval/embed.ts';
+export * from './retrieval/fuse.ts';
+export * from './retrieval/retrieve.ts';

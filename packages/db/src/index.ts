@@ -1,7 +1,10 @@
 export { prisma } from './client.ts';
-export type { Prisma, PrismaClient } from '@prisma/client';
+// `Prisma` is a value export: the ai chunk store needs `Prisma.sql`/`Prisma.empty` at runtime.
+export { Prisma } from '@prisma/client';
+export type { PrismaClient } from '@prisma/client';
 export type {
   Account,
+  AiChunk,
   AuditLog,
   Board,
   BoardProjectionEdge,

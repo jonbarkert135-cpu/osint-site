@@ -41,6 +41,10 @@ export const prismaMock = {
   repository: { findUnique: vi.fn(), findFirst: vi.fn() },
   githubAnalysis: { findFirst: vi.fn() },
   runLogEntry: { findMany: vi.fn(), findFirst: vi.fn(), createMany: vi.fn() },
+  // Raw pgvector access (ai chunk store).
+  $queryRaw: vi.fn(),
+  $executeRaw: vi.fn(),
+  $transaction: vi.fn(),
 };
 
 export const recordAuditMock = vi.fn();

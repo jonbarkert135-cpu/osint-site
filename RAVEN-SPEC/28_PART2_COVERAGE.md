@@ -615,3 +615,27 @@ Still open, and stated rather than papered over: the runner does not yet instant
 in its plan path (`main.ts` runs the plan locally), and a second machine that claims work still needs
 its own container executor — `execute` is injected exactly so that confinement stays the host's (N5).
 The server exists; the second box does not. Containerized engines still have no pinned image digest.
+
+---
+
+## Batch: retrieval finally has somewhere to live (14_AI_AGENT.md §6) (2026-09-01)
+
+Not a Part-2 § — this closes the top hole in `25_IMPLEMENTATION_STATUS.md`: the AI layer had
+capabilities but no retrieval. Now the math lives in `packages/ai/src/retrieval/` (browser-safe, N2):
+`chunk.ts` (title chunk + 512/64-token windows, paragraph → sentence → hard split, sha-256
+`contentHash` via WebCrypto), `embed.ts` (`POST /embeddings` on the one configured OpenAI-compatible
+endpoint, batched at 96), `fuse.ts` (RRF K=60, recency/pinned/degree boosts, ≤2 chunks per node) and
+`retrieve.ts` (storage injected — the package still never touches a database, R1).
+
+Storage is migration `0009_ai_retrieval`: `ai_chunks` with `vector(1536)`, an HNSW index and a
+lexical expression GIN index — the latter two live only in SQL because Prisma cannot express them.
+`apps/api/src/ai/chunkStore.ts` owns the two queries (both tenant-scoped by `project_id` in the
+WHERE clause), and `ai.search` (viewer, read-only, N4) fuses them. No embedding endpoint → the
+answer is keyword-only and says so: `semantic: false` (U5). `AI_EMBED_MODEL` joins the server env
+(default `text-embedding-3-small`, dimension 1536 per §6.4).
+
+Still open, and stated rather than papered over: nothing writes chunks yet — the worker's `ai:embed`
+queue with its debounce/reconciliation triggers (§6.6) is the next batch, so today `ai.search` over a
+fresh project honestly returns nothing. Capabilities also do not pull retrieval chunks into their
+context tiers (§6.2) yet, and the boost signals (`observedAt`/pinned/degree) are not wired to real
+projection data at the API call site.

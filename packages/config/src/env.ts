@@ -32,6 +32,8 @@ export const serverEnv = z
     AI_PROVIDER: z.enum(['openai-compatible', 'mock']).default('mock'),
     AI_BASE_URL: z.string().url().optional(),
     AI_API_KEY: z.string().optional(),
+    // 14_AI_AGENT.md §3: the configurable default embedding model (dimension 1536).
+    AI_EMBED_MODEL: z.string().default('text-embedding-3-small'),
     AI_MONTHLY_BUDGET_USD: z.coerce.number().default(50),
     OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
     OTEL_SERVICE_NAME: z.string().default('raven-api'),
