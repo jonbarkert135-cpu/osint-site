@@ -82,7 +82,7 @@ export const processWatcherJob = async (
   options: { readonly dir?: string } = {},
 ): Promise<readonly DriftFinding[]> => {
   const findings = await runWatcher(name, WATCHED_ENGINES, deps);
-  await appendFindings(findings, options);
+  await appendFindings(findings, { ...options, at: deps.now?.() ?? new Date() });
   return findings;
 };
 
