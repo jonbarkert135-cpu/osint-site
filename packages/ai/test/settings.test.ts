@@ -139,14 +139,12 @@ describe('probeAiEndpoint', () => {
   });
 
   it('reports a timeout when the endpoint stalls past timeoutMs', async () => {
-    const fetchImpl = vi.fn(
-      (_url: string, init: RequestInit) =>
-        new Promise<Response>((_resolve, reject) => {
-          init.signal?.addEventListener('abort', () => {
-            reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
-          });
-        }),
-    );
+    const fetchImpl: typeof fetch = (_url, init) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+        });
+      });
 
     const result = await probeAiEndpoint({
       baseUrl: 'http://ai.local/v1',
