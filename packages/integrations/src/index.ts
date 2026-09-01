@@ -5,6 +5,7 @@ export * from './errors.ts';
 export * from './capabilities.ts';
 export * from './manifest.ts';
 export * from './license.ts';
+export * from './contract.ts';
 export * from './pinnedImages.ts';
 export * from './safeDefaults.ts';
 export * from './pipeline.ts';
