@@ -145,10 +145,11 @@ model Project {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  org    Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  boards Board[]
-  files  File[]
-  runs   IntegrationRun[]
+  org      Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  boards   Board[]
+  files    File[]
+  runs     IntegrationRun[]
+  aiChunks AiChunk[]
 
   @@unique([orgId, key])
   @@index([orgId, archivedAt])
@@ -641,4 +642,29 @@ model UsernameWatch {
   @@unique([projectId, nodeId])
   @@index([nextRunAt])
   @@map("username_watches")
+}
+
+/// One retrieval chunk for hybrid search (14_AI_AGENT.md §6.4). `embedding` is pgvector — Prisma
+/// cannot express its HNSW index or the lexical expression index, so both live only in the
+/// migration SQL. `content_hash` makes re-embedding idempotent; `model` is part of the unique key
+/// so two embedding generations can coexist during a model migration.
+model AiChunk {
+  id          String                       @id
+  projectId   String                       @map("project_id")
+  boardId     String?                      @map("board_id")
+  nodeId      String                       @map("node_id")
+  kind        String                       @db.VarChar(16)
+  ord         Int
+  text        String
+  tokenCount  Int                          @map("token_count")
+  contentHash String                       @map("content_hash") @db.VarChar(64)
+  model       String                       @db.VarChar(120)
+  embedding   Unsupported("vector(1536)")?
+  createdAt   DateTime                     @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([nodeId, kind, ord, model])
+  @@index([projectId, nodeId])
+  @@map("ai_chunks")
 }
