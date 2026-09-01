@@ -2,6 +2,7 @@ import type { BoardEdge, BoardNode } from '@nexus/domain';
 import type { ImportProposal } from '@nexus/integrations/pipeline';
 
 import type { AIProvider } from './provider.ts';
+import type { ScoredChunk } from './retrieval/fuse.ts';
 
 export const AI_CAPABILITIES = [
   'summarize-node',
@@ -31,6 +32,11 @@ export interface AIRunContext {
   readonly provider: AIProvider;
   /** Caller-supplied ids keep the run pure and let the client pre-compute the ghost preview. */
   readonly newId: () => string;
+  /**
+   * Project-scoped chunk retrieval (§6.2 retrieval tier). Optional: local mode has no chunk
+   * store, and capabilities must degrade to graph-only context without it (U5).
+   */
+  readonly retrieve?: (query: string) => Promise<readonly ScoredChunk[]>;
   /** Capability target: selected nodes, or the edge being explained. */
   readonly nodeIds?: readonly string[];
   readonly edgeId?: string;

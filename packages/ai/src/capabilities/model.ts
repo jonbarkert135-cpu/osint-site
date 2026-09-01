@@ -7,11 +7,65 @@
 import type { BoardNode } from '@nexus/domain';
 import type { ImportProposal, ProposalItem } from '@nexus/integrations/pipeline';
 
+import { assembleContext, type ContextMember } from '../context/assemble.ts';
+import { serializeNode } from '../context/serialize.ts';
 import { aiProvenance, buildAIProposal, edgeItem, existingRef, noteItem } from '../proposal.ts';
 import { AIUnavailableError } from '../provider.ts';
 import { nodeText, type AICapability, type AIRunContext } from '../types.ts';
 
 const MAX_CONTEXT_NODES = 40;
+// §6.2 defaults until per-capability budgets (§5.14) are modeled: context 8k, output reserve 1k.
+const CONTEXT_BUDGET = 8_000;
+const OUTPUT_RESERVE = 1_000;
+
+/**
+ * Multi-node capability context per §6.2: focus = the selected nodes, neighbours = their 1-hop
+ * graph neighbours, retrieval = project chunks for the selection's titles (when the caller wired
+ * `ctx.retrieve`), metadata = one line about the board. Missing tiers just yield their budget.
+ */
+async function assembledContext(ctx: AIRunContext, nodes: readonly BoardNode[]): Promise<string> {
+  const focusIds = new Set(nodes.map((node) => node.id));
+  const byId = new Map(ctx.graph.nodes.map((node) => [node.id, node]));
+  const neighbourIds = new Set<string>();
+  for (const edge of ctx.graph.edges) {
+    if (focusIds.has(edge.source.nodeId) && !focusIds.has(edge.target.nodeId)) {
+      neighbourIds.add(edge.target.nodeId);
+    }
+    if (focusIds.has(edge.target.nodeId) && !focusIds.has(edge.source.nodeId)) {
+      neighbourIds.add(edge.source.nodeId);
+    }
+  }
+  const member = (node: BoardNode): ContextMember => ({ id: node.id, text: serializeNode(node) });
+  const neighbours = [...neighbourIds]
+    .map((id) => byId.get(id))
+    .filter((node): node is BoardNode => node !== undefined && node.status === 'active')
+    .map(member);
+
+  let retrieval: ContextMember[] = [];
+  if (ctx.retrieve !== undefined) {
+    const query = nodes
+      .map((node) => node.title)
+      .join('; ')
+      .slice(0, 200);
+    // Retrieval failing must not fail the capability — the graph tiers still stand (U5).
+    const chunks = await ctx.retrieve(query).catch(() => []);
+    retrieval = chunks.map((chunk) => ({ id: chunk.id, text: chunk.text }));
+  }
+
+  return assembleContext({
+    focus: nodes.map(member),
+    neighbours,
+    retrieval,
+    metadata: [
+      {
+        id: ctx.boardId,
+        text: `<board id="${ctx.boardId}" nodes="${String(ctx.graph.nodes.length)}" edges="${String(ctx.graph.edges.length)}"></board>`,
+      },
+    ],
+    budget: CONTEXT_BUDGET,
+    reserve: OUTPUT_RESERVE,
+  }).text;
+}
 
 function selected(ctx: AIRunContext): readonly BoardNode[] {
   const live = ctx.graph.nodes.filter((node) => node.status === 'active');
@@ -126,9 +180,7 @@ export const investigationSummary: AICapability = {
   async run(ctx) {
     const nodes = selected(ctx).slice(0, MAX_CONTEXT_NODES);
     if (nodes.length === 0) throw new AIUnavailableError('the board has no active nodes');
-    const context = nodes
-      .map((node, index) => `${String(index + 1)}. [${node.type}] ${nodeText(node)}`)
-      .join('\n');
+    const context = await assembledContext(ctx, nodes);
     const text = await ctx.provider.complete(
       `You are summarising an OSINT-style investigation board. Write a concise summary: what is known, what connects, and what is still open. Plain text, no preamble.\n\n${context}`,
     );
@@ -159,7 +211,7 @@ export const generateNote: AICapability = {
   async run(ctx) {
     const nodes = selected(ctx).slice(0, MAX_CONTEXT_NODES);
     if (nodes.length === 0) throw new AIUnavailableError('generate-note needs at least one node');
-    const context = nodes.map((node) => `[${node.type}] ${nodeText(node)}`).join('\n\n');
+    const context = await assembledContext(ctx, nodes);
     const text = await ctx.provider.complete(
       `Draft one research note from the material below: the facts it establishes, the open questions, and what to check next. Plain text, no preamble.\n\n${context}`,
     );
