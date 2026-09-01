@@ -28,8 +28,11 @@ CREATE TABLE "ai_chunks" (
 CREATE UNIQUE INDEX "ai_chunks_node_id_kind_ord_model_key" ON "ai_chunks"("node_id", "kind", "ord", "model");
 -- safe: same — this is the retriever's tenant-scoped scan
 CREATE INDEX "ai_chunks_project_id_node_id_idx" ON "ai_chunks"("project_id", "node_id");
--- safe: same — semantic index Prisma cannot express (14_AI_AGENT.md §6.4)
-CREATE INDEX "ai_chunks_vec_idx" ON "ai_chunks" USING hnsw ("embedding" vector_cosine_ops) WITH (m = 16, ef_construction = 64);
+-- safe: same — semantic index Prisma cannot express (14_AI_AGENT.md §6.4). Indexed as a halfvec
+-- expression: an expression index is invisible to `prisma migrate diff` (a plain column index on
+-- an Unsupported field trips the drift check), and halfvec halves the index size at ~no recall
+-- cost per pgvector's own guidance. Queries must use the same expression to hit the index.
+CREATE INDEX "ai_chunks_vec_idx" ON "ai_chunks" USING hnsw ((("embedding")::halfvec(1536)) halfvec_cosine_ops) WITH (m = 16, ef_construction = 64);
 -- safe: same — lexical expression index; the retriever queries to_tsvector('simple', "text") directly
 CREATE INDEX "ai_chunks_tsv_idx" ON "ai_chunks" USING gin (to_tsvector('simple', "text"));
 

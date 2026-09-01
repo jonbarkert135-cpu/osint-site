@@ -56,24 +56,30 @@ describe('apiTokens.create', () => {
     ...over,
   });
 
-  it('stores only the hash and returns the plaintext exactly once', async () => {
-    prismaMock.apiToken.create.mockResolvedValue(created());
+  // argon2id at 19 MiB is deliberately slow; under coverage-instrumented CI one hash can take
+  // ~10 s, so the hashing tests get a generous timeout instead of the 20 s default.
+  it(
+    'stores only the hash and returns the plaintext exactly once',
+    { timeout: 90_000 },
+    async () => {
+      prismaMock.apiToken.create.mockResolvedValue(created());
 
-    const result = await caller(ctx({ role: 'editor' })).apiTokens.create({
-      name: 'CI',
-      scopes: [readScope],
-    });
+      const result = await caller(ctx({ role: 'editor' })).apiTokens.create({
+        name: 'CI',
+        scopes: [readScope],
+      });
 
-    const data = prismaMock.apiToken.create.mock.calls[0]?.[0].data as Record<string, string>;
-    expect(data.hash).toBeTruthy();
-    expect(data.hash).not.toBe(result.token);
-    expect(result.token).toContain(data.prefix);
-    // The plaintext must not reach the audit trail.
-    expect(JSON.stringify(recordAuditMock.mock.calls)).not.toContain(result.token);
-    expect(recordAuditMock).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'apiToken.created', targetId: 't1' }),
-    );
-  });
+      const data = prismaMock.apiToken.create.mock.calls[0]?.[0].data as Record<string, string>;
+      expect(data.hash).toBeTruthy();
+      expect(data.hash).not.toBe(result.token);
+      expect(result.token).toContain(data.prefix);
+      // The plaintext must not reach the audit trail.
+      expect(JSON.stringify(recordAuditMock.mock.calls)).not.toContain(result.token);
+      expect(recordAuditMock).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'apiToken.created', targetId: 't1' }),
+      );
+    },
+  );
 
   it('refuses scopes the caller role does not hold', async () => {
     await expect(
@@ -96,7 +102,7 @@ describe('apiTokens.create', () => {
     expect(prismaMock.apiToken.create).not.toHaveBeenCalled();
   });
 
-  it('passes an explicit expiry through and defaults it to null', async () => {
+  it('passes an explicit expiry through and defaults it to null', { timeout: 90_000 }, async () => {
     prismaMock.apiToken.create.mockResolvedValue(created());
     const expiresAt = new Date('2030-01-01T00:00:00.000Z');
 

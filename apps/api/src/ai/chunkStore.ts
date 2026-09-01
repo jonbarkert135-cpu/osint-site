@@ -32,12 +32,15 @@ export function createChunkStore(embedModel: string): ChunkSearch {
       const literal = vectorLiteral(embedding);
       const rows = await prisma.$transaction(async (tx) => {
         await tx.$executeRaw`SET LOCAL hnsw.ef_search = ${Prisma.raw(String(EF_SEARCH))}`;
+        // The halfvec cast mirrors the HNSW expression index in 0009_ai_retrieval — a bare
+        // "embedding" comparison would fall back to a sequential scan.
         return tx.$queryRaw<Row[]>`
-          SELECT "id", "node_id", "text", 1 - ("embedding" <=> ${literal}::vector) AS score
+          SELECT "id", "node_id", "text",
+                 1 - (("embedding")::halfvec(1536) <=> ${literal}::halfvec(1536)) AS score
           FROM "ai_chunks"
           WHERE "project_id" = ${scope.projectId} ${boardFilter(scope)}
             AND "model" = ${embedModel} AND "embedding" IS NOT NULL
-          ORDER BY "embedding" <=> ${literal}::vector
+          ORDER BY ("embedding")::halfvec(1536) <=> ${literal}::halfvec(1536)
           LIMIT ${limit}`;
       });
       return toChunks(rows);
