@@ -169,10 +169,17 @@ run console (§24).
    app now has the caller: `queries.plan` (`apps/api/src/trpc/routers/queries.ts`) enqueues one and
    the Ask panel's "Run on the host" button calls it in any build with a backend. The containerized
    engines still have no pinned image digest (`13_SHERLOCK.md` §1.2).
-3. The external worker loop ships (`packages/transforms/src/remoteWorker.ts`) and now has a
-   transport — `httpQueue.ts`: `createHttpWorkerTransport()` for the worker, `handleQueueRequest()`
-   as the Result API the core mounts. What is still missing is a deployment: nothing in the repo
-   runs a worker on a second machine, so §36 is wired end to end in tests but not in production.
+3. The external worker loop ships (`packages/transforms/src/remoteWorker.ts`), the transport ships
+   (`httpQueue.ts`: `createHttpWorkerTransport()` for the worker, `handleQueueRequest()` as the pure
+   Result API), and both now have a home: `apps/runner/src/remoteQueueHttp.ts` mounts the Result API
+   on a real `node:http` server with a bearer shared secret (`createRemoteQueueServer`) and gives the
+   worker a runnable HTTP drain loop over the platform `fetch` (`createHttpRemoteWorker`,
+   `runRemoteWorkerLoop`). The two halves are tested over a real socket, not only the injected
+   loopback fetch. The process door stays in the runner, so the package remains browser-safe (N2).
+   What is still missing is the last wiring, and it is stated rather than papered over: the runner
+   does not yet instantiate a `RemoteQueue` in its plan path (`main.ts` runs the plan locally), and a
+   second machine that claims work still needs its own container executor — `execute` is injected
+   precisely so that confinement stays the host's (N5). The server exists; the second box does not.
 4. Footprints for derived passports are conservative defaults, not measurements. Real numbers come
    from running the engines under the resource manager (`29` §6) and recording what they use.
 

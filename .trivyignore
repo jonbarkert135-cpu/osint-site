@@ -24,6 +24,9 @@ CVE-2026-42504
 CVE-2026-46600
 CVE-2026-56852
 CVE-2026-56853
+# CVE-2026-56854 is in golang.org/x/crypto/ssh (auth bypass via unenforced source-address
+# restrictions); the web image's Caddy runs as a static file server and exposes no SSH endpoint.
+CVE-2026-56854
 CVE-2026-56858
 CVE-2026-56859
 CVE-2026-56860

@@ -582,3 +582,36 @@ never ends (U5).
 Still open: no deployment runs the external worker on a second machine, and containerized engines
 still have no pinned image digest, so a host plan today runs the same native engines the tab does —
 the difference is where, not yet what.
+
+---
+
+## Batch: the remote execution queue gets a server on both ends (§36)
+
+The remote-execution transport had been carrying the same shape as every gap before it — the
+mechanism existed, nothing ran it. `packages/transforms/src/httpQueue.ts` was pure and browser-safe
+(`handleQueueRequest` a `(queue, request) → response` function, `createHttpWorkerTransport` three
+injected fetches) and tested only against a loopback fetch, which proves the two halves agree but
+not that either has a server to live on.
+
+**The server.** `apps/runner/src/remoteQueueHttp.ts` — `createRemoteQueueServer({ queue, token })`
+mounts the Result API on a real `node:http` server bound to loopback, checks an
+`Authorization: Bearer` shared secret with a timing-safe compare before the queue is touched at all,
+reads a size-bounded JSON body (1 MiB; larger or malformed → 400), and otherwise hands off to
+`handleQueueRequest` verbatim. The host adds a socket and a secret, not a second copy of the
+protocol — authentication is the one thing the pure router leaves to whoever mounts it.
+
+**The worker.** `createHttpRemoteWorker` wires `createHttpWorkerTransport` to the platform `fetch`
+(`nodeQueueFetch`) and `createRemoteWorker`, and `runRemoteWorkerLoop` drains until a stop signal —
+busy queue with no gap, empty queue with an injected idle wait, and no throw on a bad round trip so
+one failed claim never stops the drain (U5). The process door (`node:http`, `node:crypto`, `fetch`)
+stays in the runner, so `@nexus/transforms` remains importable from the browser bundle (N2).
+
+Tested over a real socket, not the loopback stub: a worker claims and completes a genuine job over
+HTTP, an empty queue answers "no work" without throwing, an unauthenticated caller is 401 and the
+queue is never touched, a wrong-token worker sees no work, a second result for a claimed job is 409,
+a malformed body is 400, and the loop drains two jobs then idles once before stopping.
+
+Still open, and stated rather than papered over: the runner does not yet instantiate a `RemoteQueue`
+in its plan path (`main.ts` runs the plan locally), and a second machine that claims work still needs
+its own container executor — `execute` is injected exactly so that confinement stays the host's (N5).
+The server exists; the second box does not. Containerized engines still have no pinned image digest.
