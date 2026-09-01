@@ -34,6 +34,9 @@ export const serverEnv = z
     AI_API_KEY: z.string().optional(),
     // 14_AI_AGENT.md §3: the configurable default embedding model (dimension 1536).
     AI_EMBED_MODEL: z.string().default('text-embedding-3-small'),
+    // 15_SECURITY.md §8.2: base64 32-byte KEK wrapping every stored credential DEK. Optional so a
+    // deployment that stores no credentials still boots; the credential API refuses to work without it.
+    CREDENTIALS_MASTER_KEY: z.string().optional(),
     AI_MONTHLY_BUDGET_USD: z.coerce.number().default(50),
     OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
     OTEL_SERVICE_NAME: z.string().default('raven-api'),
@@ -101,6 +104,7 @@ export const SECRET_ENV_KEYS = [
   'SYNC_SHARED_SECRET',
   'RUNNER_SHARED_SECRET',
   'AI_API_KEY',
+  'CREDENTIALS_MASTER_KEY',
 ] as const;
 
 export type SecretEnvKey = (typeof SECRET_ENV_KEYS)[number];

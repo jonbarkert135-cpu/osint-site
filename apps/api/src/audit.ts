@@ -43,7 +43,10 @@ export type AuditAction =
   | 'repository.analysis.requested'
   | 'query.plan.requested'
   | 'apiToken.created'
-  | 'apiToken.revoked';
+  | 'apiToken.revoked'
+  | 'credential.created'
+  | 'credential.rotated'
+  | 'credential.deleted';
 
 export interface AuditInput extends Omit<AuditEntry, 'action' | 'orgId'> {
   action: AuditAction;

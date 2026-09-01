@@ -14,6 +14,7 @@ import { repositoriesRouter } from './routers/repositories.ts';
 import { watchesRouter } from './routers/watches.ts';
 import { queriesRouter } from './routers/queries.ts';
 import { aiRouter } from './routers/aiSearch.ts';
+import { credentialsRouter } from './routers/credentials.ts';
 
 export const appRouter = router({
   auth: authRouter,
@@ -32,6 +33,7 @@ export const appRouter = router({
   watches: watchesRouter,
   queries: queriesRouter,
   ai: aiRouter,
+  credentials: credentialsRouter,
 });
 
 /** Consumed by `apps/web` as a type-only import — the client never imports the runtime router. */
