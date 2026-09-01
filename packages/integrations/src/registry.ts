@@ -27,6 +27,7 @@ import {
   type RelationshipMapper,
   type IntegrationSource,
 } from './pipeline.ts';
+import { evaluateSafeDefaults, type SafeDefaultsVerdict } from './safeDefaults.ts';
 import {
   safeParseManifest,
   type IntegrationId,
@@ -43,6 +44,8 @@ export interface RegistryEntry {
   readonly extractor: EntityExtractor;
   readonly nodeMapper: NodeMapper;
   readonly relationshipMapper: RelationshipMapper;
+  /** Why this integration is (or is not) on by default — §61. Surfaced in Admin, never hidden. */
+  readonly safeDefaults: SafeDefaultsVerdict;
   enabledForOrg(orgId: string): Promise<boolean>;
 }
 
@@ -88,6 +91,7 @@ export function buildRegistry(sources: readonly IntegrationSource[]): Registry {
       continue;
     }
     const manifest = parsed.manifest;
+    const safeDefaults = evaluateSafeDefaults(manifest);
     entries.set(manifest.id, {
       manifest,
       parser: source.parser,
@@ -99,7 +103,10 @@ export function buildRegistry(sources: readonly IntegrationSource[]): Registry {
         source.relationshipMapper === undefined
           ? defaultRelationshipMapper()
           : source.relationshipMapper(manifest),
-      enabledForOrg: source.enabledForOrg ?? (() => Promise.resolve(true)),
+      safeDefaults,
+      // §61: absent an explicit per-org decision, an integration is only on when every gate
+      // passed. A source may still supply its own resolver (that *is* the operator's decision).
+      enabledForOrg: source.enabledForOrg ?? (() => Promise.resolve(safeDefaults.enabledByDefault)),
     });
   }
 

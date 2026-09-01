@@ -6,6 +6,7 @@
  * is what makes §13 point 1's five assertions a one-liner in each tool's PR.
  */
 
+import { classifyLicense } from '../license.ts';
 import { safeParseManifest, type IntegrationManifest } from '../manifest.ts';
 import type {
   ArtifactRef,
@@ -47,6 +48,16 @@ export function checkManifestConformance(
   // only ever surface above as `schema` issues. Re-checking them here would be dead code; what the
   // schema cannot know is which node and edge types this *build* registers, so that is what is
   // left.
+  // §60: the schema only knows `license` is a string. Whether that string means anything is a
+  // separate question, and an unreviewed licence is a conformance failure, not a warning.
+  const license = classifyLicense(manifest.license);
+  if (license.category === 'unknown') {
+    issues.push({
+      rule: 'license-known',
+      message: `license "${manifest.license}" is not a reviewed SPDX id — add it to license.ts after checking it`,
+    });
+  }
+
   for (const mapping of manifest.entityMappings) {
     if (
       options.knownNodeTypes !== undefined &&
