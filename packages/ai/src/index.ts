@@ -7,3 +7,5 @@ export * from './retrieval/embed.ts';
 export * from './retrieval/fuse.ts';
 export * from './retrieval/retrieve.ts';
 export * from './retrieval/queue.ts';
+export * from './context/serialize.ts';
+export * from './context/assemble.ts';

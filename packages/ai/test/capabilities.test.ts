@@ -201,7 +201,7 @@ describe('openAICompatibleProvider', () => {
       baseUrl: 'http://localhost:11434/v1/',
       model: 'llama3.1:8b',
       apiKey: 'k',
-      fetchImpl: fetchImpl as unknown as typeof fetch,
+      fetchImpl: fetchImpl,
     });
     await expect(provider.complete('hello')).resolves.toBe('hi');
     expect(fetchImpl.mock.calls[0]?.[0]).toBe('http://localhost:11434/v1/chat/completions');
@@ -211,18 +211,18 @@ describe('openAICompatibleProvider', () => {
     const bad = openAICompatibleProvider({
       baseUrl: 'http://x/v1',
       model: 'm',
-      fetchImpl: (() => Promise.resolve({ ok: false, status: 502 } as Response)) as typeof fetch,
+      fetchImpl: () => Promise.resolve({ ok: false, status: 502 } as Response),
     });
     await expect(bad.complete('x')).rejects.toThrow(AIUnavailableError);
 
     const empty = openAICompatibleProvider({
       baseUrl: 'http://x/v1',
       model: 'm',
-      fetchImpl: (() =>
+      fetchImpl: () =>
         Promise.resolve({
           ok: true,
           json: () => Promise.resolve({}),
-        } as unknown as Response)) as typeof fetch,
+        } as unknown as Response),
     });
     await expect(empty.complete('x')).rejects.toThrow(AIUnavailableError);
   });
@@ -263,5 +263,71 @@ describe('note, document and repository capabilities', () => {
     await expect(
       runCapability('explain-repository', ctx({ nodes: [node('a', 'A')] }, { provider })),
     ).rejects.toThrow(AIUnavailableError);
+  });
+});
+
+describe('capability context (§6.2)', () => {
+  const capture = () => {
+    const prompts: string[] = [];
+    return {
+      prompts,
+      provider: {
+        modelId: 'llama3.1:8b',
+        complete: (prompt: string) => {
+          prompts.push(prompt);
+          return Promise.resolve('a summary');
+        },
+      },
+    };
+  };
+
+  it('feeds retrieval chunks and serialized nodes into investigation-summary', async () => {
+    const { prompts, provider } = capture();
+    const retrieve = vi.fn(() =>
+      Promise.resolve([{ id: 'c1', nodeId: 'n9', text: 'CHUNK-FROM-PGVECTOR', score: 1 }]),
+    );
+    await runCapability(
+      'investigation-summary',
+      ctx({ nodes: [node('a', 'Acme')] }, { provider, retrieve }),
+    );
+    expect(retrieve).toHaveBeenCalledWith('Acme');
+    expect(prompts[0]).toContain('CHUNK-FROM-PGVECTOR');
+    expect(prompts[0]).toContain('<node id="a"');
+    expect(prompts[0]).toContain('<board id="board-1"');
+  });
+
+  it('includes 1-hop neighbours of the selection', async () => {
+    const { prompts, provider } = capture();
+    await runCapability(
+      'generate-note',
+      ctx(
+        {
+          nodes: [node('a', 'Focus'), node('b', 'Neighbour'), node('c', 'Far')],
+          edges: [
+            {
+              id: 'e1',
+              type: 'mentions',
+              source: { nodeId: 'a', port: 'auto', offset: 0.5, anchorKey: null },
+              target: { nodeId: 'b', port: 'auto', offset: 0.5, anchorKey: null },
+            } as unknown as AIGraph['edges'][number],
+          ],
+        },
+        { provider, nodeIds: ['a'] },
+      ),
+    );
+    expect(prompts[0]).toContain('<node id="b"');
+    expect(prompts[0]).not.toContain('<node id="c"');
+  });
+
+  it('survives a failing retriever with graph-only context (U5)', async () => {
+    const { provider } = capture();
+    const result = await runCapability(
+      'generate-note',
+      ctx(
+        { nodes: [node('a', 'Acme')] },
+        { provider, retrieve: () => Promise.reject(new Error('down')) },
+      ),
+    );
+    expect(result.findings).toHaveLength(1);
   });
 });
