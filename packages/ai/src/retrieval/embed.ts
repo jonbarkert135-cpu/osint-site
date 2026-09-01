@@ -30,7 +30,9 @@ export function unavailableEmbedder(): Embedder {
 
 export function openAICompatibleEmbedder(options: EmbedderOptions): Embedder {
   const doFetch = options.fetchImpl ?? fetch;
-  const url = `${options.baseUrl.replace(/\/+$/, '')}/embeddings`;
+  let baseUrl = options.baseUrl;
+  while (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+  const url = `${baseUrl}/embeddings`;
   return {
     modelId: options.model,
     async embed(inputs, signal) {
