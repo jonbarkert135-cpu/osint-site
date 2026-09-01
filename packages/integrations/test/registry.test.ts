@@ -125,6 +125,31 @@ describe('buildRegistry', () => {
   });
 });
 
+describe('contract gating in the registry (§63)', () => {
+  it('keeps an adapter that breaks its contract out of the entries', () => {
+    const registry = buildRegistry([
+      source({ parser: { schemaVersions: ['99.0'], parse: expandUrlParser.parse } }),
+    ]);
+
+    expect(registry.entries.size).toBe(0);
+    expect(registry.rejected[0]?.id).toBe(expandUrl.id);
+    expect(registry.rejected[0]?.issues[0]?.path).toBe('contract.metadata');
+  });
+
+  it('still loads the sound adapters alongside a contract-breaking one', () => {
+    const registry = buildRegistry([
+      source(),
+      source({
+        raw: raw({ id: 'bad-contract' }),
+        parser: { schemaVersions: [], parse: expandUrlParser.parse },
+      }),
+    ]);
+
+    expect([...registry.entries.keys()]).toEqual([expandUrl.id]);
+    expect(registry.rejected.map((rejection) => rejection.id)).toEqual(['bad-contract']);
+  });
+});
+
 describe('loadRegistry', () => {
   it('loads the built-ins only, unless third-party discovery is opted into', async () => {
     const third = source({ raw: raw({ id: 'third-party' }) });

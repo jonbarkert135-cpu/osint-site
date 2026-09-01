@@ -27,6 +27,7 @@ import {
   type RelationshipMapper,
   type IntegrationSource,
 } from './pipeline.ts';
+import { checkStaticContract, contractIssues } from './contract.ts';
 import { evaluateSafeDefaults, type SafeDefaultsVerdict } from './safeDefaults.ts';
 import {
   safeParseManifest,
@@ -91,6 +92,13 @@ export function buildRegistry(sources: readonly IntegrationSource[]): Registry {
       continue;
     }
     const manifest = parsed.manifest;
+    // §63: an adapter that breaks the contract does not reach the production registry. It is
+    // reported next to the schema-invalid ones rather than thrown, for the same reason (§4.3).
+    const violations = checkStaticContract(manifest, source.parser);
+    if (violations.length > 0) {
+      rejected.push({ id: manifest.id, issues: contractIssues(violations) });
+      continue;
+    }
     const safeDefaults = evaluateSafeDefaults(manifest);
     entries.set(manifest.id, {
       manifest,

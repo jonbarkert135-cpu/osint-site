@@ -817,3 +817,29 @@ UI (модель и выборка «проектный ключ важнее or
 Не сделано в этой пачке: UI-переключатель «включить несмотря на блокировку» и таблица
 `integration_enablement` для хранения решения оператора per-org; сводный отчёт по лицензиям
 транзитивных npm-зависимостей (помечен UNVERIFIED); §62–63 (контрактные тесты движков) — следующая пачка.
+
+## Пачка — тестирование движков и контракт адаптера (2026-09-01)
+
+Пункты §62 (TESTING OF ENGINES) и §63 (CONTRACT TESTING). Раньше «контракт» адаптера существовал
+только как типы TypeScript: манифест валидировался схемой, а поведение парсера — нет, и сломанный
+адаптер попадал в production registry и падал в рантайме.
+
+| требование спеки                                     | статус | доказательство                                                                                                             |
+| ---------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------- |
+| Input Contract                                       | ✅     | `checkStaticContract` (required+derived, selection без kinds) + `checkAdapterContract` (`accepts`, `adapt`, target scopes) |
+| Execution Contract                                   | ✅     | пустой allowlist, `output.maxBytes > limits.maxOutputBytes`, outputs > `maxArtifacts`, primary output контейнера           |
+| Progress Contract                                    | ✅     | бюджет парсера (`budgetMs`, по умолчанию 5 000 мс) на корректном и на битом входе                                          |
+| Result Contract                                      | ✅     | pointer / observedAt / `parserConfidence ∈ [0,1]` / неотрицательные counters / непустые nonFatalIssues                     |
+| Error Contract                                       | ✅     | любой отказ парсера — `IntegrationError` с кодом §11, а не голый `TypeError`                                               |
+| Metadata Contract                                    | ✅     | `parser.schemaVersions` пересекается с `manifest.parser.supportedOutputVersions`                                           |
+| Нарушивший контракт adapter не попадает в production | ✅     | `buildRegistry()` вызывает `checkStaticContract` и отправляет source в `rejected` с `path: contract.<name>`                |
+| Unit / Integration / Adapter / Health тесты          | ✅     | таблица соответствия категорий §62 в `RAVEN-SPEC/33_ENGINE_CONTRACT_TESTING.md`                                            |
+| Timeout / Failure тесты                              | ✅     | Progress + Error Contract в `checkAdapterContract`                                                                         |
+| Output normalization / Duplicate handling            | ✅     | Result Contract: нормализация полей и сравнение двух прогонов одного fixture                                               |
+| Гейт применён ко всем встроенным движкам             | ✅     | `test/contract.builtins.test.ts` прогоняет контракт по каждому `BUILTIN_SOURCES` + проверяет пустой `rejected`             |
+
+Тесты: `packages/integrations/test/contract.test.ts` (19), `test/contract.builtins.test.ts` (6),
+два новых кейса в `test/registry.test.ts`. Документ: `RAVEN-SPEC/33_ENGINE_CONTRACT_TESTING.md`.
+Не сделано в этой пачке: проверка того, что парсер стримит, а не буферизует артефакт (§3.4);
+контракт для extractor/mapper-стадий; golden-fixture корпус на каждый адаптер; таймауты стадии
+execution (живут в runner). Дальше по бэклогу: §64 (observability) и §66 (HIDDEN_CLOUD_DEPLOYMENT.md).
