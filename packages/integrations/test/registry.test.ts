@@ -29,6 +29,36 @@ const source = (over: Partial<IntegrationSource> = {}): IntegrationSource => ({
   ...over,
 });
 
+describe('safe defaults in the registry (§61)', () => {
+  it('defaults enablement to the gate verdict rather than to on', async () => {
+    const blocked = buildRegistry([source({ raw: raw({ maturity: 'experimental' }) })]);
+    const entry = blocked.entries.get(expandUrl.id);
+
+    expect(entry?.safeDefaults.enabledByDefault).toBe(false);
+    expect(entry?.safeDefaults.blockers.map((b) => b.check)).toContain('compatibility');
+    await expect(entry?.enabledForOrg('org-1')).resolves.toBe(false);
+  });
+
+  it('enables an integration that passes every gate', async () => {
+    const entry = buildRegistry([source()]).entries.get(expandUrl.id);
+
+    expect(entry?.safeDefaults.blockers).toEqual([]);
+    await expect(entry?.enabledForOrg('org-1')).resolves.toBe(true);
+  });
+
+  it('lets an explicit resolver override the default', async () => {
+    const entry = buildRegistry([
+      source({
+        raw: raw({ maturity: 'experimental' }),
+        enabledForOrg: (orgId: string) => Promise.resolve(orgId === 'org-1'),
+      }),
+    ]).entries.get(expandUrl.id);
+
+    await expect(entry?.enabledForOrg('org-1')).resolves.toBe(true);
+    await expect(entry?.enabledForOrg('org-2')).resolves.toBe(false);
+  });
+});
+
 describe('buildRegistry', () => {
   it('registers a valid manifest under its id with default stages', () => {
     const registry = buildRegistry([source()]);
