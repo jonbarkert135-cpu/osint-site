@@ -34,9 +34,15 @@ vi.mock('../src/env.ts', () => ({
   loadServerEnvFromProcess: () => ({ REDIS_URL: 'redis://localhost:6379' }),
 }));
 
-const { RUN_QUEUE, closeQueue, enqueueRun, publishRunEvent, requestRunCancel } = await import(
-  '../src/integrations/queue.ts'
-);
+const {
+  PLAN_QUEUE,
+  RUN_QUEUE,
+  closeQueue,
+  enqueuePlan,
+  enqueueRun,
+  publishRunEvent,
+  requestRunCancel,
+} = await import('../src/integrations/queue.ts');
 
 const payload = { runId: 'r1', orgId: 'o1', attempt: 1 };
 
@@ -48,6 +54,8 @@ beforeEach(async () => {
   redisPublish.mockResolvedValue(1);
   QueueCtor.mockClear();
   RedisCtor.mockClear();
+  queueClose.mockClear();
+  redisDisconnect.mockClear();
 });
 
 describe('enqueueRun', () => {
@@ -71,6 +79,41 @@ describe('enqueueRun', () => {
       maxRetriesPerRequest: null,
     });
     expect(QueueCtor).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('enqueuePlan', () => {
+  it('adds one plan job on its own queue, sharing the redis connection (§36)', async () => {
+    await enqueuePlan({
+      runId: 'r1',
+      orgId: 'o1',
+      query: 'raven.io',
+      mode: 'zero-credential',
+      permissions: ['network'],
+    });
+
+    expect(queueAdd).toHaveBeenCalledWith(
+      PLAN_QUEUE,
+      {
+        runId: 'r1',
+        orgId: 'o1',
+        query: 'raven.io',
+        mode: 'zero-credential',
+        permissions: ['network'],
+      },
+      { attempts: 1, removeOnComplete: 1000, removeOnFail: 5000 },
+    );
+    expect(QueueCtor).toHaveBeenCalledTimes(1);
+    expect(RedisCtor).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes with the rest and reopens on the next call', async () => {
+    const job = { runId: 'r1', orgId: 'o1', query: 'raven.io', mode: 'free-tier', permissions: [] };
+    await enqueuePlan(job);
+    await closeQueue();
+    await enqueuePlan(job);
+
+    expect(QueueCtor).toHaveBeenCalledTimes(2);
   });
 });
 

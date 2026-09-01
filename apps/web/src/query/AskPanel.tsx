@@ -20,7 +20,9 @@ import { Button } from '@nexus/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type * as Y from 'yjs';
 
+import { localOnly } from '../mode/appMode.ts';
 import { logActivity } from '../system/activityLog.ts';
+import { HostRunButton } from './HostRunButton.tsx';
 import { ExecutionView } from './ExecutionView.tsx';
 import { ProposalReview } from '../integrations/ProposalReview.tsx';
 import { toImportProposal } from './investigationProposal.ts';
@@ -252,6 +254,10 @@ export function AskPanel({ open, onClose, doc, boardId, onUndo, hostFetch }: Ask
             >
               Run plan
             </Button>
+          )}
+          {/* §36/§37: the same query, planned and executed on the host instead of in the tab. */}
+          {localOnly ? null : (
+            <HostRunButton query={raw} mode={mode} disabled={runner.phase === 'running'} />
           )}
           {runner.phase === 'running' ? (
             <span className="nx-muted" data-testid="ask-progress">
