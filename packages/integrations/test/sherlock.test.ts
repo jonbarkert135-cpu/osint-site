@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { ArtifactRef, ParseContext, RawRunResult } from '../src/pipeline.ts';
 import { sherlockImageDigest, sherlockManifest, SHERLOCK_IMAGE } from '../sherlock/manifest.ts';
+import { pinnedDigest, PINNED_IMAGES } from '../src/pinnedImages.ts';
 import { detectShape, parser, readStatus, safeProfileUrl } from '../sherlock/parser.ts';
 import { sherlockSources } from '../sherlock/source.ts';
 
@@ -71,12 +72,16 @@ describe('sherlock manifest', () => {
     expect(username?.required).toBe(true);
   });
 
-  it('is absent from the registry until the deployment pins a digest', () => {
-    expect(sherlockImageDigest({})).toBeUndefined();
-    expect(sherlockImageDigest({ SHERLOCK_IMAGE_DIGEST: 'latest' })).toBeUndefined();
+  it('prefers the deployment override, falls back to the repo pin, never a floating tag', () => {
+    // §6.2: the repo ships a real digest resolved from the registry, so there is always a pin.
+    expect(sherlockImageDigest({})).toBe(pinnedDigest(SHERLOCK_IMAGE));
+    expect(sherlockImageDigest({})).toMatch(/^sha256:[a-f0-9]{64}$/);
+    // An invalid override is ignored rather than trusted, and a valid one wins.
+    expect(sherlockImageDigest({ SHERLOCK_IMAGE_DIGEST: 'latest' })).toBe(
+      pinnedDigest(SHERLOCK_IMAGE),
+    );
     expect(sherlockImageDigest({ SHERLOCK_IMAGE_DIGEST: DIGEST })).toBe(DIGEST);
-    // No digest in this test environment, so the source list is empty rather than floating.
-    expect(sherlockSources).toHaveLength(0);
+    expect(sherlockSources).toHaveLength(1);
   });
 });
 
@@ -159,5 +164,20 @@ describe('sherlock parser', () => {
     await expect(parser.parse(runResult(), context('nonsense'))).rejects.toThrow(
       /PARSE_UNSUPPORTED_SHAPE|shape/i,
     );
+  });
+});
+
+describe('pinned images (§6.2)', () => {
+  it('pins every image by a well-formed digest with a resolution date', () => {
+    expect(PINNED_IMAGES.length).toBeGreaterThan(0);
+    for (const pin of PINNED_IMAGES) {
+      expect(pin.digest).toMatch(/^sha256:[a-f0-9]{64}$/);
+      expect(pin.tag).not.toBe('');
+      expect(pin.resolvedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    }
+  });
+
+  it('returns undefined for an image that is not pinned', () => {
+    expect(pinnedDigest('not/pinned')).toBeUndefined();
   });
 });
