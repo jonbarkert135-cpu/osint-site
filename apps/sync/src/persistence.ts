@@ -55,7 +55,19 @@ export function createPrismaSnapshotStore(
   };
 }
 
-export function createPrismaProjectionWriter(prisma: PrismaClient): ProjectionWriter {
+export interface ProjectionHooks {
+  /**
+   * Fired after a diff commits, once per upserted node (14_AI_AGENT.md §6.6 trigger 1). The hook
+   * enqueues `ai.embed`; whether the text actually changed is the worker's `content_hash` check —
+   * the writer does not keep prior text. Errors must not fail the projection.
+   */
+  onNodeUpserted?(nodeId: string): void;
+}
+
+export function createPrismaProjectionWriter(
+  prisma: PrismaClient,
+  hooks: ProjectionHooks = {},
+): ProjectionWriter {
   return {
     async loadPriorState(boardId): Promise<PriorProjectionState> {
       const [nodes, edges] = await Promise.all([
@@ -119,6 +131,8 @@ export function createPrismaProjectionWriter(prisma: PrismaClient): ProjectionWr
         }
         for (const id of diff.deleteNodeIds) {
           await tx.boardProjectionNode.deleteMany({ where: { id, boardId } });
+          // Node delete cascades to its retrieval chunks in the same transaction (14 §6.6).
+          await tx.aiChunk.deleteMany({ where: { nodeId: id } });
         }
         for (const edge of diff.upsertEdges) {
           await tx.boardProjectionEdge.upsert({
@@ -151,6 +165,7 @@ export function createPrismaProjectionWriter(prisma: PrismaClient): ProjectionWr
           await tx.boardProjectionEdge.deleteMany({ where: { id, boardId } });
         }
       });
+      for (const node of diff.upsertNodes) hooks.onNodeUpserted?.(node.id);
     },
 
     async markProjected(boardId, at) {

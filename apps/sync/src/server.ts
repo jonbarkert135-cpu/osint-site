@@ -17,7 +17,10 @@ import type {
 } from '@hocuspocus/server';
 import { Database } from '@hocuspocus/extension-database';
 import { Redis as RedisExtension } from '@hocuspocus/extension-redis';
+import { Queue } from 'bullmq';
+import IORedis from 'ioredis';
 import * as Y from 'yjs';
+import { AI_EMBED_QUEUE, embedJobOptions } from '@nexus/ai';
 import { createLogger } from '@nexus/config/log';
 import { loadServerEnvFromProcess } from '@nexus/config/env-file';
 import { prisma } from '@nexus/db';
@@ -47,7 +50,21 @@ const logger = createLogger({
 });
 
 const snapshotStore = createPrismaSnapshotStore(prisma, () => randomUUID());
-const projectionWriter = createPrismaProjectionWriter(prisma);
+
+// Retrieval freshness (14_AI_AGENT.md §6.6 trigger 1): every projected node upsert enqueues an
+// `ai.embed` job, debounced 20 s per node by its jobId. Lazy and fire-and-forget: a Redis outage
+// must never fail a projection — the nightly reconciliation (§6.6.5, not built yet) is the catch-up.
+let embedQueue: Queue | null = null;
+function enqueueEmbed(nodeId: string): void {
+  embedQueue ??= new Queue(AI_EMBED_QUEUE, {
+    connection: new IORedis(env.REDIS_URL, { maxRetriesPerRequest: null }),
+  });
+  embedQueue.add(AI_EMBED_QUEUE, { nodeId }, embedJobOptions(nodeId)).catch((error: unknown) => {
+    logger.warn({ event: 'embed.enqueue_failed', node_id: nodeId, error: String(error) });
+  });
+}
+
+const projectionWriter = createPrismaProjectionWriter(prisma, { onNodeUpserted: enqueueEmbed });
 
 /** 10 MB per-message cap (P8 §7/§9/edge case §8) — Hocuspocus's own limit is per-frame; this one
  * additionally protects the projector from an oversized single update. */
