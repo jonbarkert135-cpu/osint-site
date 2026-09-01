@@ -6,12 +6,14 @@
  * necessity (§3.3): it contacts hundreds of third-party sites, and enumerating them would be a lie
  * dressed as an allowlist. Private ranges stay denied, which is the part that actually matters.
  *
- * The image is pinned by digest (`SHERLOCK_IMAGE_DIGEST`). An unconfigured deployment gets **no**
- * Sherlock rather than a floating `:latest` — `sherlockSources` is then empty and the registry
- * never sees it.
+ * The image is pinned by digest: `SHERLOCK_IMAGE_DIGEST` when a deployment pins its own build,
+ * otherwise the repo's pin from `pinnedImages.ts` (§6.2, refreshed by `scripts/pin-images.mjs`
+ * through the registry API — no Docker needed). A floating `:latest` is never used; if neither
+ * source has a valid digest, `sherlockSources` is empty and the registry never sees Sherlock.
  */
 
 import { parseManifest, type EntityMapping, type IntegrationManifest } from '../src/manifest.ts';
+import { pinnedDigest } from '../src/pinnedImages.ts';
 
 export const SHERLOCK_ID = 'sherlock';
 export const SHERLOCK_IMAGE = 'sherlock/sherlock';
@@ -23,8 +25,10 @@ const DIGEST = /^sha256:[a-f0-9]{64}$/;
 export function sherlockImageDigest(
   env: Record<string, string | undefined> = {},
 ): string | undefined {
-  const digest = env.SHERLOCK_IMAGE_DIGEST;
-  return digest !== undefined && DIGEST.test(digest) ? digest : undefined;
+  const override = env.SHERLOCK_IMAGE_DIGEST;
+  // A deployment's own pin wins; an invalid override is ignored rather than silently trusted.
+  if (override !== undefined && DIGEST.test(override)) return override;
+  return pinnedDigest(SHERLOCK_IMAGE);
 }
 
 /** Claimed profiles only; §5.4 forbids importing "available" as if it meant anything about a person. */
