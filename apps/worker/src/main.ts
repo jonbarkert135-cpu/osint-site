@@ -246,12 +246,16 @@ export const prismaEmbedStore: EmbedStore = {
   },
 
   async existing(nodeId, model) {
-    const rows = await prisma.aiChunk.findMany({
-      where: { nodeId, model },
-      select: { id: true, kind: true, ord: true, contentHash: true },
-    });
+    // `embedding` is Unsupported() in the Prisma schema, so its NULL-ness travels via raw SQL.
+    const rows = await prisma.$queryRaw<
+      { id: string; kind: string; ord: number; content_hash: string; has_vector: boolean }[]
+    >`SELECT "id", "kind", "ord", "content_hash", ("embedding" IS NOT NULL) AS "has_vector"
+      FROM "ai_chunks" WHERE "node_id" = ${nodeId} AND "model" = ${model}`;
     return new Map(
-      rows.map((row) => [`${row.kind}:${String(row.ord)}`, { id: row.id, hash: row.contentHash }]),
+      rows.map((row) => [
+        `${row.kind}:${String(row.ord)}`,
+        { id: row.id, hash: row.content_hash, hasVector: row.has_vector },
+      ]),
     );
   },
 

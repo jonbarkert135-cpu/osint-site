@@ -243,6 +243,7 @@ async function main(): Promise<void> {
       // stores before closing sockets.
       await server.destroy();
       await eviction.flushAll([]);
+      await embedQueue?.close();
       await metricsApp.close();
       await prisma.$disconnect();
       process.exit(0);

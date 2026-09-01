@@ -3,7 +3,8 @@
  * repo's other queue names. One job per node: re-read the node from the projection, chunk its
  * `searchFields()` text (§6.3), embed only the chunks whose `content_hash` changed, and write the
  * rows the retriever reads (§6.4). No embedding endpoint → the rows are still written with a NULL
- * vector, so keyword search works and semantic search picks them up on the next full re-embed (U5).
+ * vector, so keyword search works (U5); vectorless rows count as changed on the next job for the
+ * node, so they regain vectors as soon as the endpoint is back.
  */
 
 import {
@@ -43,8 +44,11 @@ export interface ChunkRow {
 
 export interface EmbedStore {
   loadNode(nodeId: string): Promise<EmbedNodeRow | null>;
-  /** Existing rows for this node+model, keyed `kind:ord` → { id, contentHash }. */
-  existing(nodeId: string, model: string): Promise<Map<string, { id: string; hash: string }>>;
+  /** Existing rows for this node+model, keyed `kind:ord`. `hasVector` false = degraded row. */
+  existing(
+    nodeId: string,
+    model: string,
+  ): Promise<Map<string, { id: string; hash: string; hasVector: boolean }>>;
   upsertChunk(row: ChunkRow): Promise<void>;
   deleteChunks(ids: readonly string[]): Promise<void>;
   deleteAllChunks(nodeId: string): Promise<void>;
@@ -103,7 +107,11 @@ export async function processEmbedJob(
       hash: await contentHash(chunk.text),
     })),
   );
-  const changed = keyed.filter(({ key, hash }) => prior.get(key)?.hash !== hash);
+  // A row without a vector was written while the endpoint was down — retry it even if unchanged.
+  const changed = keyed.filter(({ key, hash }) => {
+    const row = prior.get(key);
+    return row === undefined || row.hash !== hash || !row.hasVector;
+  });
 
   // One provider call for the whole node; the embedder batches at 96 internally (§6.6).
   let vectors: number[][] | null = null;

@@ -32,7 +32,7 @@ interface FakeStore extends EmbedStore {
 
 function fakeStore(
   row: EmbedNodeRow | null,
-  prior: Map<string, { id: string; hash: string }> = new Map(),
+  prior: Map<string, { id: string; hash: string; hasVector: boolean }> = new Map(),
 ): FakeStore {
   const store: FakeStore = {
     upserts: [],
@@ -95,7 +95,7 @@ describe('processEmbedJob', () => {
     const prior = new Map(
       first.upserts.map((row) => [
         `${row.kind}:${String(row.ord)}`,
-        { id: `chunk-${row.kind}`, hash: row.contentHash },
+        { id: `chunk-${row.kind}`, hash: row.contentHash, hasVector: true },
       ]),
     );
     const second = fakeStore(node(), prior);
@@ -104,6 +104,25 @@ describe('processEmbedJob', () => {
     expect(outcome).toMatchObject({ status: 'unchanged', embedded: 0 });
     expect(second.upserts).toHaveLength(0);
     expect(embedder.calls).toHaveLength(1); // only the first run called the endpoint
+  });
+
+  it('re-embeds vectorless rows even when their hash is unchanged', async () => {
+    const first = fakeStore(node());
+    const embedder = fakeEmbedder();
+    await processEmbedJob({ store: first, embedder }, { nodeId: 'node-1' });
+
+    // Same hashes, but the rows were written degraded (endpoint was down): they must retry.
+    const prior = new Map(
+      first.upserts.map((row) => [
+        `${row.kind}:${String(row.ord)}`,
+        { id: `chunk-${row.kind}`, hash: row.contentHash, hasVector: false },
+      ]),
+    );
+    const second = fakeStore(node(), prior);
+    const outcome = await processEmbedJob({ store: second, embedder }, { nodeId: 'node-1' });
+
+    expect(outcome).toMatchObject({ status: 'embedded', embedded: 2, degraded: false });
+    expect(second.upserts.every((row) => row.embedding !== null)).toBe(true);
   });
 
   it('writes NULL-vector rows when the endpoint is unavailable (keyword-only, U5)', async () => {
@@ -144,8 +163,8 @@ describe('processEmbedJob', () => {
 
   it('removes rows the new chunking no longer produces', async () => {
     const prior = new Map([
-      ['title:0', { id: 'keep-maybe', hash: 'old' }],
-      ['body:7', { id: 'stale-7', hash: 'x' }],
+      ['title:0', { id: 'keep-maybe', hash: 'old', hasVector: true }],
+      ['body:7', { id: 'stale-7', hash: 'x', hasVector: true }],
     ]);
     const store = fakeStore(node(), prior);
     await processEmbedJob({ store, embedder: fakeEmbedder() }, { nodeId: 'node-1' });

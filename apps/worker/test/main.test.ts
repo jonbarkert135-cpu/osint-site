@@ -14,6 +14,7 @@ const prismaMock = {
   runLogEntry: { findFirst: vi.fn(), createMany: vi.fn() },
   aiChunk: { findMany: vi.fn(), deleteMany: vi.fn() },
   $executeRaw: vi.fn(() => Promise.resolve(1)),
+  $queryRaw: vi.fn(() => Promise.resolve<unknown[]>([])),
 };
 
 // `Prisma.sql` as a plain tag so the vector-vs-NULL fragments are visible in assertions.
@@ -516,7 +517,7 @@ describe('embedderFromEnv', () => {
 describe('prismaEmbedStore', () => {
   beforeEach(() => {
     prismaMock.boardProjectionNode.findUnique.mockReset();
-    prismaMock.aiChunk.findMany.mockReset();
+    prismaMock.$queryRaw.mockReset();
     prismaMock.aiChunk.deleteMany.mockReset();
     prismaMock.$executeRaw.mockClear();
   });
@@ -547,14 +548,14 @@ describe('prismaEmbedStore', () => {
     });
   });
 
-  it('existing keys rows by kind:ord', async () => {
-    prismaMock.aiChunk.findMany.mockResolvedValueOnce([
-      { id: 'c1', kind: 'title', ord: 0, contentHash: 'h1' },
-      { id: 'c2', kind: 'body', ord: 1, contentHash: 'h2' },
+  it('existing keys rows by kind:ord and reports vectorless rows', async () => {
+    prismaMock.$queryRaw.mockResolvedValueOnce([
+      { id: 'c1', kind: 'title', ord: 0, content_hash: 'h1', has_vector: true },
+      { id: 'c2', kind: 'body', ord: 1, content_hash: 'h2', has_vector: false },
     ]);
     const map = await prismaEmbedStore.existing('n1', 'm');
-    expect(map.get('title:0')).toEqual({ id: 'c1', hash: 'h1' });
-    expect(map.get('body:1')).toEqual({ id: 'c2', hash: 'h2' });
+    expect(map.get('title:0')).toEqual({ id: 'c1', hash: 'h1', hasVector: true });
+    expect(map.get('body:1')).toEqual({ id: 'c2', hash: 'h2', hasVector: false });
   });
 
   const row = {
