@@ -32,6 +32,7 @@ import { watchCancel, type CancelBackend } from './cancel.ts';
 import { createBuiltinExecutor } from './executors/builtin.ts';
 import { createContainerExecutor, dockerRuntime } from './executors/container.ts';
 import { createHttpExecutor } from './executors/http.ts';
+import { observeRun, startMetricsServer, withRunSlot } from './metrics.ts';
 import { nodeHostFetch, nodeResolver, nodeTransport } from './net.ts';
 import {
   JOB_OPTIONS,
@@ -323,6 +324,7 @@ export async function runJob(deps: RunnerDeps, raw: unknown): Promise<RawRunResu
     await secrets?.cleanup();
   }
 
+  observeRun(manifest.id, result);
   writer.log({
     level: result.error === undefined ? 'info' : 'error',
     phase: 'collect',
@@ -469,10 +471,15 @@ export async function start(): Promise<() => Promise<void>> {
     async (job: Job) => {
       const id = randomUUID();
       log.info({ event: 'run.claimed', job_id: job.id, trace: id }, 'claimed a run');
-      await runJob(deps, job.data);
+      await withRunSlot(() => runJob(deps, job.data));
     },
     { connection, concurrency: Number(process.env.RUNNER_CONCURRENCY ?? 2) },
   );
+
+  // Metrics bind only when the deployment asks for a port, so tests and the local `pnpm dev`
+  // stack do not hold a listener (19_DEPLOYMENT.md §10.2).
+  const metricsPort = Number(process.env.METRICS_PORT ?? 0);
+  const metrics = metricsPort > 0 ? await startMetricsServer(metricsPort) : undefined;
 
   const runtime = dockerRuntime();
   const reaper = setInterval(() => {
@@ -492,6 +499,7 @@ export async function start(): Promise<() => Promise<void>> {
 
   return async () => {
     clearInterval(reaper);
+    await metrics?.close();
     await worker.close();
     await planWorker.close();
     await parseQueue.close();

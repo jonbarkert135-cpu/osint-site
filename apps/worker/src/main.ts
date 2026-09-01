@@ -27,6 +27,7 @@ import {
   type GithubJobPayload,
 } from '@nexus/integrations/github/jobs';
 
+import { measureJob, pollQueueDepth, startMetricsServer } from './metrics.ts';
 import { createGithubHttp } from './net/github-http.ts';
 import {
   WATCHER_QUEUE,
@@ -300,37 +301,38 @@ export function startGithubWorker(
   const concurrency = Math.max(...Object.values(GITHUB_JOB_SPECS).map((spec) => spec.concurrency));
   return new Worker(
     GITHUB_QUEUE,
-    async (job: Job) => {
-      const name = job.name as GithubJobName;
-      const data = job.data as { runId?: string } & GithubJobPayload[GithubJobName];
-      // Cancellation is a Redis-side flag; the poller turns it into the AbortSignal §10 requires.
-      const controller = new AbortController();
-      const poll = setInterval(() => {
-        void job
-          .isActive()
-          .then((active) => {
-            if (!active) controller.abort();
-          })
-          .catch(() => controller.abort());
-      }, 2_000);
-      try {
-        const outcome = await processGithubJob(
-          { handlers, store },
-          name,
-          data,
-          data.runId ?? '',
-          controller.signal,
-        );
-        log.info(
-          { event: 'github.finished', job: name, status: outcome.status },
-          'github job done',
-        );
-        // A failure must reach BullMQ too, or the retry policy in §10 never fires.
-        if (outcome.status === 'failed') throw new Error(outcome.error?.code ?? 'GH_UNKNOWN');
-      } finally {
-        clearInterval(poll);
-      }
-    },
+    async (job: Job) =>
+      measureJob(GITHUB_QUEUE, job, async () => {
+        const name = job.name as GithubJobName;
+        const data = job.data as { runId?: string } & GithubJobPayload[GithubJobName];
+        // Cancellation is a Redis-side flag; the poller turns it into the AbortSignal §10 requires.
+        const controller = new AbortController();
+        const poll = setInterval(() => {
+          void job
+            .isActive()
+            .then((active) => {
+              if (!active) controller.abort();
+            })
+            .catch(() => controller.abort());
+        }, 2_000);
+        try {
+          const outcome = await processGithubJob(
+            { handlers, store },
+            name,
+            data,
+            data.runId ?? '',
+            controller.signal,
+          );
+          log.info(
+            { event: 'github.finished', job: name, status: outcome.status },
+            'github job done',
+          );
+          // A failure must reach BullMQ too, or the retry policy in §10 never fires.
+          if (outcome.status === 'failed') throw new Error(outcome.error?.code ?? 'GH_UNKNOWN');
+        } finally {
+          clearInterval(poll);
+        }
+      }),
     {
       connection,
       concurrency,
@@ -349,24 +351,25 @@ export function start(): Promise<() => Promise<void>> {
 
   const worker = new Worker(
     PARSE_QUEUE,
-    async (job: Job) => {
-      const runId = (job.data as { runId?: string }).runId ?? '';
-      const outcome = await processParseJob(
-        {
-          store: prismaParseStore,
-          artifacts: s3ArtifactReader(env),
-          newProposalId: () => newId.proposal(),
-          publish: (id, event) => {
-            void publisher.publish(`run:${id}`, JSON.stringify(event));
+    async (job: Job) =>
+      measureJob(PARSE_QUEUE, job, async () => {
+        const runId = (job.data as { runId?: string }).runId ?? '';
+        const outcome = await processParseJob(
+          {
+            store: prismaParseStore,
+            artifacts: s3ArtifactReader(env),
+            newProposalId: () => newId.proposal(),
+            publish: (id, event) => {
+              void publisher.publish(`run:${id}`, JSON.stringify(event));
+            },
           },
-        },
-        runId,
-      );
-      log.info(
-        { event: 'parse.finished', run_id: runId, status: outcome.status },
-        'parse job finished',
-      );
-    },
+          runId,
+        );
+        log.info(
+          { event: 'parse.finished', run_id: runId, status: outcome.status },
+          'parse job finished',
+        );
+      }),
     { connection, concurrency: Number(process.env.WORKER_CONCURRENCY ?? 4) },
   );
 
@@ -398,23 +401,24 @@ export function start(): Promise<() => Promise<void>> {
   });
   const watcherWorker = new Worker(
     WATCHER_QUEUE,
-    async (job: Job) => {
-      const findings = await processWatcherJob(job.name as WatcherName, {
-        github: githubGet,
-        json: jsonFetch,
-        text: textFetch,
-      });
-      const drift = findings.filter((finding) => finding.status === 'drift');
-      log.info(
-        {
-          event: 'watch.finished',
-          watcher: job.name,
-          checked: findings.length,
-          drift: drift.length,
-        },
-        'registry watcher finished',
-      );
-    },
+    async (job: Job) =>
+      measureJob(WATCHER_QUEUE, job, async () => {
+        const findings = await processWatcherJob(job.name as WatcherName, {
+          github: githubGet,
+          json: jsonFetch,
+          text: textFetch,
+        });
+        const drift = findings.filter((finding) => finding.status === 'drift');
+        log.info(
+          {
+            event: 'watch.finished',
+            watcher: job.name,
+            checked: findings.length,
+            drift: drift.length,
+          },
+          'registry watcher finished',
+        );
+      }),
     { connection, concurrency: 1 },
   );
 
@@ -422,16 +426,25 @@ export function start(): Promise<() => Promise<void>> {
   const embedder = embedderFromEnv(env);
   const embedWorker = new Worker(
     AI_EMBED_QUEUE,
-    async (job: Job) => {
-      const payload = job.data as EmbedJobPayload;
-      const outcome = await processEmbedJob({ store: prismaEmbedStore, embedder }, payload);
-      log.info(
-        { event: 'embed.finished', node_id: payload.nodeId, ...outcome },
-        'embed job finished',
-      );
-    },
+    async (job: Job) =>
+      measureJob(AI_EMBED_QUEUE, job, async () => {
+        const payload = job.data as EmbedJobPayload;
+        const outcome = await processEmbedJob({ store: prismaEmbedStore, embedder }, payload);
+        log.info(
+          { event: 'embed.finished', node_id: payload.nodeId, ...outcome },
+          'embed job finished',
+        );
+      }),
     { connection, concurrency: 4 },
   );
+
+  // Queue depth is polled, not derived from handlers; the metrics port binds only when the
+  // deployment sets it (19_DEPLOYMENT.md §10.2).
+  const stopDepth = pollQueueDepth([githubQueue, watcherQueue], 15_000, (error: unknown) => {
+    log.warn({ event: 'metrics.depth_failed', error: String(error) }, 'queue depth poll failed');
+  });
+  const metricsPort = Number(process.env.METRICS_PORT ?? 0);
+  const metrics = metricsPort > 0 ? startMetricsServer(metricsPort) : undefined;
 
   log.info(
     { event: 'worker.started' },
@@ -439,6 +452,8 @@ export function start(): Promise<() => Promise<void>> {
   );
 
   return Promise.resolve(async () => {
+    stopDepth();
+    await (await metrics)?.close();
     await worker.close();
     await githubWorker.close();
     await githubQueue.close();

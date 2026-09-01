@@ -843,3 +843,31 @@ UI (модель и выборка «проектный ключ важнее or
 Не сделано в этой пачке: проверка того, что парсер стримит, а не буферизует артефакт (§3.4);
 контракт для extractor/mapper-стадий; golden-fixture корпус на каждый адаптер; таймауты стадии
 execution (живут в runner). Дальше по бэклогу: §64 (observability) и §66 (HIDDEN_CLOUD_DEPLOYMENT.md).
+
+## Пачка — observability движков и план деплоя Hidden Cloud (2026-09-01)
+
+Пункты §64 (OBSERVABILITY) и §66 (HIDDEN CLOUD DEPLOYMENT PLAN). До этой пачки метрики были только
+у `apps/api` и `apps/sync`: `prom-client` лежал в зависимостях runner и worker, но ни одна метрика
+не писалась — то есть про самые дорогие процессы (движки и очереди) оператор не знал ничего.
+
+| требование спеки                             | статус | доказательство                                                                                                                                                   |
+| -------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Структурные логи                             | ✅     | `packages/config/src/log.ts` (было), все четыре сервиса пишут `event`-enum                                                                                       |
+| Latency движков                              | ✅     | `raven_run_duration_seconds{tool}` + `raven_run_output_bytes{tool}` в `apps/runner/src/metrics.ts`                                                               |
+| Failures движков по классам                  | ✅     | `raven_runs_total{tool,status}`, `outcomeOf()` → success/failed/timeout/resource_limit/blocked                                                                   |
+| Sandbox-нарушения                            | ✅     | `raven_runner_sandbox_violations_total{kind}` из `stats.egressDenied` и `SANDBOX_VIOLATION.detail`                                                               |
+| Глубина очередей                             | ✅     | `raven_queue_depth{queue}`, поллинг `getJobCounts('waiting','delayed')` каждые 15 с                                                                              |
+| Метрики задач                                | ✅     | `measureJob()` оборачивает все четыре очереди worker'а: duration, failures{reason}, retries                                                                      |
+| Resource usage                               | ⚠️     | `RunStats.peakMemMiB` пишется в run row, но метрики для него §10.2 не определяет — не выдумывали                                                                 |
+| Экспорт метрик                               | ✅     | `/metrics` на `node:http` (без Fastify — его нет в зависимостях), порт биндится только по `METRICS_PORT`                                                         |
+| Tracing                                      | ❌     | §10.1 не реализован, `trace_id`/`span_id` не заполняются — честно указано в §4 документа                                                                         |
+| HIDDEN_CLOUD_DEPLOYMENT.md                   | ✅     | корень репозитория: архитектура, процессы, порты, runtime, storage, env, build, startup, restart, migrations, worker startup, monitoring, logs, backup, rollback |
+| Никаких выдуманных возможностей Hidden Cloud | ✅     | 9 пунктов **UNVERIFIED** в §16 документа, каждый со ссылкой на файл, которого не хватает                                                                         |
+
+Тесты: `apps/runner/test/metrics.test.ts` (10), `apps/worker/test/metrics.test.ts` (11).
+Документы: `RAVEN-SPEC/34_OBSERVABILITY.md`, `HIDDEN_CLOUD_DEPLOYMENT.md`.
+Не сделано в этой пачке: остальные семейства метрик §10.2 (auth, documents, egress/SSRF, files, AI,
+client RUM, db pool, `raven_migration_pending`, `raven_backup_last_success_timestamp`); сам
+Prometheus/Grafana в стеке; OpenTelemetry и Sentry/GlitchTip; compose-сервисы и образы для
+sync/worker/runner; бэкап-скрипт и restore-drill (это самая большая дыра, отмечена в §14 документа).
+Дальше по бэклогу: §65 (performance architecture), §67/§68 (fallback + manual mode).
