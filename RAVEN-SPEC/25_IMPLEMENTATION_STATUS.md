@@ -871,3 +871,35 @@ client RUM, db pool, `raven_migration_pending`, `raven_backup_last_success_times
 Prometheus/Grafana в стеке; OpenTelemetry и Sentry/GlitchTip; compose-сервисы и образы для
 sync/worker/runner; бэкап-скрипт и restore-drill (это самая большая дыра, отмечена в §14 документа).
 Дальше по бэклогу: §65 (performance architecture), §67/§68 (fallback + manual mode).
+
+## Пачка — performance architecture: выбор движков и pacing провайдеров (2026-09-01)
+
+Пункт §65. До этой пачки план исполнялся целиком: если каталог отдавал 12 шагов под режим, все 12
+уходили в исполнение, а единственным ограничителем были бюджет узлов и `maxParallel`. Провайдерские
+лимиты (`ProviderManifest.limits`) существовали в манифестах и не применялись нигде во время рана.
+
+| требование спеки                        | статус | доказательство                                                                                                            |
+| --------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------- |
+| Planner выбирает необходимые engines    | ✅     | `packages/query-engine/src/prioritise.ts`: score = yield × priority × 1/depth ÷ секунды, потолки шагов/времени/минимума   |
+| Каждый отказ — с причиной               | ✅     | `cost-not-justified` / `over-resource-budget` + note, попадают в `plan.excluded` и в существующий UI «12 скрыто»          |
+| Шаг не остаётся без своей зависимости   | ✅     | шаг принимается вместе с предками; не влез бандл — не влез и шаг (`prioritise.test.ts`)                                   |
+| Parallelism                             | ✅     | было: DAG-планировщик + `maxParallel` слотов (Part 2 §12–§13)                                                             |
+| Queue / workers                         | ✅     | было: BullMQ в `apps/worker`, глубина очередей в метриках (§64)                                                           |
+| Caching                                 | ✅     | было: `ResultCache` по (transform, engine, provider, канонический вход), хит помечается `cached`                          |
+| Streaming                               | ✅     | было: `QueryEvent` идут в UI по ходу рана                                                                                 |
+| Rate limits                             | ✅     | `packages/query-engine/src/pace.ts`: интервал из `requestsPerMinute`, отказ по `requestsPerDay` → `provider-rate-limited` |
+| Backpressure                            | ✅     | high-water 256 событий в канале executor'а; драйвер перестаёт ставить шаги, пока потребитель не разгребёт                 |
+| Включено в продукте, а не только в либе | ✅     | `apps/runner/src/plan.ts`: `prioritise(registry, planned)` + `createPacer()` на процесс                                   |
+
+Тесты: `packages/query-engine/test/prioritise.test.ts` (16), `test/pace.test.ts` (10), плюс 4 новых
+в `test/executor.test.ts` (pacing + backpressure). Документ: `RAVEN-SPEC/35_PERFORMANCE_ARCHITECTURE.md`.
+
+Грабли, на которые наступили: ожидание backpressure нельзя ставить между проверкой `inFlight.size`
+и `Promise.race(inFlight)` — пустой race не резолвится никогда, и ран зависает. Ожидание перенесено
+в начало итерации драйвера, случай закрыт тестом с медленным потребителем.
+
+Не сделано в этой пачке: кросс-ран планировщик (потолки — на один ран, десять ранов допускают по 12
+шагов каждый); адаптивный скоринг (веса статические, `health.ts` в выбор не подаётся); pacer живёт в
+памяти процесса — два runner'а держат по своему бюджету на один провайдер; бенчмарка оркестрации на
+10/100/1000 параллельных ранов нет (её просит §74). Дальше по бэклогу: §67/§68 (fallback + manual
+mode), §69–§71 (единый UX и deep view).

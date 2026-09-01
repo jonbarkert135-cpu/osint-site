@@ -16,3 +16,5 @@ export * from './schedule.ts';
 export * from './executor.ts';
 export * from './health.ts';
 export * from './resources.ts';
+export * from './pace.ts';
+export * from './prioritise.ts';
