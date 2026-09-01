@@ -1,0 +1,38 @@
+# Weekly image-digest drift check (10_INTEGRATIONS.md §6.2). Resolves each pin in
+# packages/integrations/src/pinnedImages.ts through the registry HTTP API — no Docker daemon — and
+# opens a PR when a published tag moved. Never auto-merges: a human approves the new digest
+# (ADR-011), because a moved tag is exactly the supply-chain event pinning exists to catch.
+name: pin-images
+on:
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Resolve pinned digests
+        id: pins
+        run: node scripts/pin-images.mjs
+      - name: Open a PR when a pin drifted
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: chore/pin-images
+          commit-message: 'chore(security): refresh pinned image digests (10 §6.2)'
+          title: 'chore(security): refresh pinned image digests (10 §6.2)'
+          body: |
+            A published tag moved, so the pinned digest no longer matches what the registry serves.
+
+            Review before merging: confirm the new digest is the upstream release you expect
+            (a moved tag is the supply-chain event pinning exists to catch). Nothing auto-merges.
+          add-paths: packages/integrations/src/pinnedImages.ts
