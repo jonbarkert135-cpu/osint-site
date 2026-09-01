@@ -747,3 +747,26 @@ rdap-lookup, ct-log-search) закрывают все восемь.
 
 Тесты: `packages/integrations/test/sherlock.test.ts` (блок «pinned images (§6.2)» + переопределение окружением); `sherlockSources` теперь непустой, потому что образ реально запинен.
 Заметка: digest'ы резолвятся по HTTPS через Docker Registry v2 (`auth.docker.io` → `registry-1.docker.io`, HEAD манифеста), локальный docker не нужен ни в CI, ни на машине разработчика.
+
+## Пачка — хранилище учётных данных с конвертным шифрованием (2026-09-01)
+
+`15_SECURITY.md` §8.1–8.2. До этого хранилища секретов в репозитории не было вовсе: любой ключ
+провайдера (GitHub PAT, SpiderFoot, AI) мог жить только в переменных окружения процесса, поэтому
+экран «Settings → AI» и пользовательские учётные данные интеграций были заблокированы.
+
+| требование спеки                              | статус | доказательство                                                                                                                                                                                        |
+| --------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Таблица `integration_credentials`             | ✅     | миграция `0010_integration_credentials` (expand-only) + модель `IntegrationCredential`: `enc_dek`, `nonce`, `ciphertext`, `key_version`, `fingerprint`, `last_four`, `last_used_at`, `rotated_at`     |
+| Конвертное шифрование AES-256-GCM             | ✅     | `apps/api/src/secrets/envelope.ts`: DEK 32 байта на запись, KEK из `CREDENTIALS_MASTER_KEY` (base64, 32 байта), AAD = `orgId\|credentialId\|version`, DEK затирается сразу после использования        |
+| AAD привязывает запись к организации и строке | ✅     | тест: тот же шифротекст, открытый под другим `orgId` или другим `credentialId`, не расшифровывается; порча байта и чужой мастер-ключ тоже дают отказ                                                  |
+| Write-only API                                | ✅     | `credentials.list/create/rotate/remove` (`apps/api/src/trpc/routers/credentials.ts`), только роль admin; наружу отдаются `label`, `fingerprint`, `last_four` — процедуры чтения секрета не существует |
+| Ровно один путь расшифровки, буфер затирается | ✅     | `apps/api/src/secrets/decrypt.ts`: `useCredential()` отдаёт `Buffer` в колбэк и затирает его в `finally` (в том числе когда колбэк бросил); функции, возвращающей строку, намеренно нет               |
+| Ротация не меняет id                          | ✅     | `credentials.rotate` перешифровывает секрет на месте и ставит `rotated_at`; ссылки на credential переживают ротацию                                                                                   |
+| Секрет не попадает в аудит и ответы           | ✅     | в аудит пишется `fingerprint`, а не значение; тест сериализует и ответ, и запись аудита и проверяет отсутствие подстроки секрета                                                                      |
+| Просроченный credential не используется       | ✅     | `useCredential` падает с «That credential has expired», `hasCredential` возвращает false                                                                                                              |
+
+Тесты: `apps/api/test/secrets.envelope.test.ts` (7), `apps/api/test/credentials.router.test.ts` (14).
+Не сделано в этой пачке: KMS-вариант KEK (интерфейс тот же — меняется один файл), фоновая перевыкладка
+DEK при ротации KEK (`rewrap-deks`), напоминание о ротации на 180 дней, `project_id`-scoped выдача из
+UI (модель и выборка «проектный ключ важнее org-wide» есть, экрана нет) и подключение существующих
+интеграций к хранилищу — GitHub и SpiderFoot по-прежнему читают ключи из окружения.

@@ -668,3 +668,32 @@ model AiChunk {
   @@index([projectId, nodeId])
   @@map("ai_chunks")
 }
+
+/// Envelope-encrypted org credentials (15_SECURITY.md §8.2): GitHub PAT, SpiderFoot key, AI
+/// provider key. Write-only by contract — no API returns `ciphertext`, and the UI identifies a
+/// credential by `label`, `lastFour` and `fingerprint` only. `encDek` is the DEK wrapped by the
+/// KEK, so a KEK rotation re-wraps this column without touching the ciphertext.
+model IntegrationCredential {
+  id            String    @id
+  orgId         String    @map("org_id")
+  /// null = the credential is org-wide rather than scoped to one project.
+  projectId     String?   @map("project_id")
+  integrationId String    @map("integration_id")
+  label         String    @db.VarChar(120)
+  encDek        Bytes     @map("enc_dek")
+  nonce         Bytes
+  ciphertext    Bytes
+  keyVersion    Int       @map("key_version")
+  /// sha256(plaintext) prefix — answers "is this the same key?" without decrypting.
+  fingerprint   String    @db.VarChar(32)
+  lastFour      String?   @map("last_four") @db.VarChar(8)
+  createdBy     String    @map("created_by")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  lastUsedAt    DateTime? @map("last_used_at")
+  rotatedAt     DateTime? @map("rotated_at")
+  expiresAt     DateTime? @map("expires_at")
+
+  @@unique([orgId, integrationId, label])
+  @@index([orgId, integrationId])
+  @@map("integration_credentials")
+}
