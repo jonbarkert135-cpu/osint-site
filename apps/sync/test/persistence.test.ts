@@ -23,11 +23,13 @@ function fakePrisma() {
     deleteMany: vi.fn(),
   };
   const board = { update: vi.fn() };
+  const aiChunk = { deleteMany: vi.fn() };
   interface Tx {
     boardProjectionNode: typeof boardProjectionNode;
     boardProjectionEdge: typeof boardProjectionEdge;
+    aiChunk: typeof aiChunk;
   }
-  const tx: Tx = { boardProjectionNode, boardProjectionEdge };
+  const tx: Tx = { boardProjectionNode, boardProjectionEdge, aiChunk };
   const $transaction = vi.fn(async (fn: (tx: Tx) => Promise<void>) => fn(tx));
 
   return {
@@ -35,6 +37,7 @@ function fakePrisma() {
     boardProjectionNode,
     boardProjectionEdge,
     board,
+    aiChunk,
     $transaction,
   } as never;
 }
@@ -152,6 +155,25 @@ describe('createPrismaProjectionWriter', () => {
     expect(
       (prisma as { $transaction: ReturnType<typeof vi.fn> }).$transaction,
     ).toHaveBeenCalledTimes(1);
+    // A deleted node takes its retrieval chunks with it in the same transaction (14 §6.6).
+    expect(
+      (prisma as { aiChunk: { deleteMany: ReturnType<typeof vi.fn> } }).aiChunk.deleteMany,
+    ).toHaveBeenCalledWith({ where: { nodeId: 'gone' } });
+  });
+
+  it('fires onNodeUpserted once per upserted node, after the transaction', async () => {
+    const prisma = fakePrisma();
+    const seen: string[] = [];
+    const writer = createPrismaProjectionWriter(prisma, {
+      onNodeUpserted: (nodeId) => seen.push(nodeId),
+    });
+    await writer.applyDiff('b1', {
+      upsertNodes: [{ id: 'n1' } as never, { id: 'n2' } as never],
+      deleteNodeIds: [],
+      upsertEdges: [],
+      deleteEdgeIds: [],
+    });
+    expect(seen).toEqual(['n1', 'n2']);
   });
 
   it('applyDiff upserts and deletes edges inside the same transaction', async () => {

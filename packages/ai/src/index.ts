@@ -6,3 +6,4 @@ export * from './retrieval/chunk.ts';
 export * from './retrieval/embed.ts';
 export * from './retrieval/fuse.ts';
 export * from './retrieval/retrieve.ts';
+export * from './retrieval/queue.ts';

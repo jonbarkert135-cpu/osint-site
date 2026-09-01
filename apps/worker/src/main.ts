@@ -9,7 +9,8 @@
 
 import { Queue, Worker, type Job } from 'bullmq';
 import IORedis from 'ioredis';
-import { prisma } from '@nexus/db';
+import { Prisma, prisma } from '@nexus/db';
+import { openAICompatibleEmbedder, unavailableEmbedder, type Embedder } from '@nexus/ai';
 import { loadServerEnvFromProcess } from '@nexus/config/env-file';
 import { createLogger } from '@nexus/config/log';
 import { newId } from '@nexus/domain';
@@ -44,6 +45,12 @@ import {
   type ParseStore,
   type RunRow,
 } from './queues/integration.parse.ts';
+import {
+  AI_EMBED_QUEUE,
+  processEmbedJob,
+  type EmbedJobPayload,
+  type EmbedStore,
+} from './queues/ai.embed.ts';
 
 const log = createLogger({
   service: 'raven-worker',
@@ -208,6 +215,78 @@ export const prismaGithubJobStore: GithubJobStore = {
   },
 };
 
+/** Same construction as `ai.search` in the API: no endpoint → honest keyword-only rows (U5). */
+export function embedderFromEnv(env: ReturnType<typeof loadServerEnvFromProcess>): Embedder {
+  return env.AI_PROVIDER === 'openai-compatible' && env.AI_BASE_URL !== undefined
+    ? openAICompatibleEmbedder({
+        baseUrl: env.AI_BASE_URL,
+        model: env.AI_EMBED_MODEL,
+        ...(env.AI_API_KEY === undefined ? {} : { apiKey: env.AI_API_KEY }),
+      })
+    : unavailableEmbedder();
+}
+
+/** pgvector rejects a bare float8[] parameter, so vectors travel as text literals (§6.4). */
+export const prismaEmbedStore: EmbedStore = {
+  async loadNode(nodeId) {
+    const row = await prisma.boardProjectionNode.findUnique({
+      where: { id: nodeId },
+      include: { board: { select: { projectId: true } } },
+    });
+    if (row === null) return null;
+    return {
+      id: row.id,
+      projectId: row.board.projectId,
+      boardId: row.boardId,
+      type: row.type,
+      title: row.title,
+      data: (row.data ?? {}) as Record<string, unknown>,
+      deletedAt: row.deletedAt,
+    };
+  },
+
+  async existing(nodeId, model) {
+    // `embedding` is Unsupported() in the Prisma schema, so its NULL-ness travels via raw SQL.
+    const rows = await prisma.$queryRaw<
+      { id: string; kind: string; ord: number; content_hash: string; has_vector: boolean }[]
+    >`SELECT "id", "kind", "ord", "content_hash", ("embedding" IS NOT NULL) AS "has_vector"
+      FROM "ai_chunks" WHERE "node_id" = ${nodeId} AND "model" = ${model}`;
+    return new Map(
+      rows.map((row) => [
+        `${row.kind}:${String(row.ord)}`,
+        { id: row.id, hash: row.content_hash, hasVector: row.has_vector },
+      ]),
+    );
+  },
+
+  async upsertChunk(row) {
+    const embedding =
+      row.embedding === null
+        ? Prisma.sql`NULL`
+        : Prisma.sql`${`[${row.embedding.join(',')}]`}::vector(1536)`;
+    await prisma.$executeRaw`
+      INSERT INTO "ai_chunks"
+        ("id", "project_id", "board_id", "node_id", "kind", "ord", "text",
+         "token_count", "content_hash", "model", "embedding")
+      VALUES (${crypto.randomUUID()}, ${row.projectId}, ${row.boardId}, ${row.nodeId},
+              ${row.kind}, ${row.ord}, ${row.text}, ${row.tokenCount}, ${row.contentHash},
+              ${row.model}, ${embedding})
+      ON CONFLICT ("node_id", "kind", "ord", "model") DO UPDATE SET
+        "text" = EXCLUDED."text",
+        "token_count" = EXCLUDED."token_count",
+        "content_hash" = EXCLUDED."content_hash",
+        "embedding" = EXCLUDED."embedding"`;
+  },
+
+  async deleteChunks(ids) {
+    await prisma.aiChunk.deleteMany({ where: { id: { in: [...ids] } } });
+  },
+
+  async deleteAllChunks(nodeId) {
+    await prisma.aiChunk.deleteMany({ where: { nodeId } });
+  },
+};
+
 /**
  * Registers the single `github` queue (§10). BullMQ has one concurrency per worker, not per job
  * name, so the highest value in the table is used and the slow jobs (`analyze`, `proposal`,
@@ -339,9 +418,24 @@ export function start(): Promise<() => Promise<void>> {
     { connection, concurrency: 1 },
   );
 
+  // Chunk ingestion for retrieval (14_AI_AGENT.md §6.6): concurrency 4 per the spec.
+  const embedder = embedderFromEnv(env);
+  const embedWorker = new Worker(
+    AI_EMBED_QUEUE,
+    async (job: Job) => {
+      const payload = job.data as EmbedJobPayload;
+      const outcome = await processEmbedJob({ store: prismaEmbedStore, embedder }, payload);
+      log.info(
+        { event: 'embed.finished', node_id: payload.nodeId, ...outcome },
+        'embed job finished',
+      );
+    },
+    { connection, concurrency: 4 },
+  );
+
   log.info(
     { event: 'worker.started' },
-    'worker is consuming integration.parse, github and watchers',
+    'worker is consuming integration.parse, github, watchers and ai.embed',
   );
 
   return Promise.resolve(async () => {
@@ -350,6 +444,7 @@ export function start(): Promise<() => Promise<void>> {
     await githubQueue.close();
     await watcherWorker.close();
     await watcherQueue.close();
+    await embedWorker.close();
     connection.disconnect();
     publisher.disconnect();
   });
